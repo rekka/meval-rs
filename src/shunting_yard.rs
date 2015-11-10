@@ -41,7 +41,7 @@ pub fn to_rpn(input: &[Token]) -> Vec<Token> {
     for token in input {
         let token = token.clone();
         match token {
-            Number(_) => output.push(token),
+            Number(_) | Var(_) => output.push(token),
             Unary(_) => stack.push(token),
             Binary(_) => {
                 let pa1 = prec_assoc(&token);
@@ -77,7 +77,6 @@ pub fn to_rpn(input: &[Token]) -> Vec<Token> {
                     panic!("Mismatched right parenthesis.");
                 }
             }
-            _ => (),
         }
     }
 
@@ -118,5 +117,6 @@ mod tests {
                    vec![Number(3.), Number(1.), Binary(Minus), Number(2.), Binary(Times)]);
         assert_eq!(to_rpn(&[Number(1.), Binary(Minus), Unary(Minus), Unary(Minus), Number(2.)]),
                    vec![Number(1.), Number(2.), Unary(Minus), Unary(Minus), Binary(Minus)]);
+        assert_eq!(to_rpn(&[Var("x".into()), Binary(Plus), Var("y".into())]), vec![Var("x".into()), Var("y".into()), Binary(Plus)]);
     }
 }
