@@ -1,7 +1,7 @@
 [package]
 authors = ["Norbert Pozar <bertapozar@gmail.com>"]
 name = "expr_eval"
-version = "0.1.0"
+version = "0.0.1"
 
 [dependencies]
-nom = { git = "https://github.com/Geal/nom.git" } 
+nom = { git = "https://github.com/Geal/nom.git" }

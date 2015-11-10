@@ -1,4 +1,4 @@
-use Token;
+use tokenizer::Token;
 
 #[derive(Debug, Clone, Copy)]
 enum Associativity {
@@ -18,8 +18,8 @@ pub enum RPNError {
 /// Return operator precedence and associativity for a given token.
 fn prec_assoc(token: &Token) -> (u32, Associativity) {
     use self::Associativity::*;
-    use Token::*;
-    use Operation::*;
+    use tokenizer::Token::*;
+    use tokenizer::Operation::*;
     match *token {
         Binary(op) => {
             match op {
@@ -41,7 +41,7 @@ fn prec_assoc(token: &Token) -> (u32, Associativity) {
 
 /// Convert a tokenized infix expression to a Reverse Polish notation.
 pub fn to_rpn(input: &[Token]) -> Result<Vec<Token>, RPNError> {
-    use Token::*;
+    use tokenizer::Token::*;
 
     let mut output = Vec::with_capacity(input.len());
     let mut stack = Vec::with_capacity(input.len());
@@ -122,8 +122,8 @@ pub fn to_rpn(input: &[Token]) -> Result<Vec<Token>, RPNError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use Token::*;
-    use Operation::*;
+    use tokenizer::Token::*;
+    use tokenizer::Operation::*;
 
     #[test]
     fn test_to_rpn() {

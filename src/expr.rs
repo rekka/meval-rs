@@ -1,51 +1,41 @@
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
+use std::collections::BTreeMap;
+use std::f64::consts;
 
-use {Token, ParseError, RPNError};
+use Error;
+use tokenizer::{Token, tokenize};
+use shunting_yard::to_rpn;
 
 /// Representain of an expression in the Reverse Polish notation form.
 pub struct Expr {
     rpn: Vec<Token>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum ExprEvalError {
-    UnknownVariable(String),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ExprError {
-    ParseError(ParseError),
-    RPNError(RPNError),
-}
-
-impl From<ParseError> for ExprError {
-    fn from(err: ParseError) -> ExprError { ExprError::ParseError(err) }
-}
-
-impl From<RPNError> for ExprError {
-    fn from(err: RPNError) -> ExprError { ExprError::RPNError(err) }
-}
-
 impl Expr {
     /// Constructs an expression by parsing a string.
-    pub fn from_str<S: AsRef<str>>(string: S) -> Result<Expr, ExprError> {
-        let tokens = try!(::tokenizer::tokenize(string));
+    pub fn from_str<S: AsRef<str>>(string: S) -> Result<Expr, Error> {
+        let tokens = try!(tokenize(string));
 
-        let rpn = try!(::shunting_yard::to_rpn(&tokens));
+        let rpn = try!(to_rpn(&tokens));
 
         Ok(Expr { rpn: rpn })
     }
 
-    /// Evaluates the expression without any variables set.
-    pub fn eval(&self) -> Result<f64, ExprEvalError> {
-        use Token::*;
-        use Operation::*;
+    /// Evaluates the expression with variables given by the argument.
+    pub fn eval<C: ExprContextProvider>(&self, ctx: C) -> Result<f64, Error> {
+        use tokenizer::Token::*;
+        use tokenizer::Operation::*;
 
         let mut stack = Vec::with_capacity(16);
 
         for token in &self.rpn {
             match *token {
-                Var(ref n) => return Err(ExprEvalError::UnknownVariable(n.clone())),
+                Var(ref n) =>
+                    if let Some(v) = ctx.get_var(n) {
+                        stack.push(v);
+                    } else {
+                        return Err(Error::UnknownVariable(n.clone()));
+                    },
                 Number(f) => stack.push(f),
                 Binary(op) => {
                     let right = stack.pop().unwrap();
@@ -80,6 +70,20 @@ impl Expr {
     }
 }
 
+/// Evaluate a string with default constants.
+pub fn eval_str<S: AsRef<str>>(expr: S) -> Result<f64, Error> {
+    let expr = try!(Expr::from_str(expr));
+
+    expr.eval(ExprContext::new())
+}
+
+/// Evaluate a string with default constants.
+pub fn eval_str_with_context<S: AsRef<str>, C: ExprContextProvider>(expr: S, ctx: C) -> Result<f64, Error> {
+    let expr = try!(Expr::from_str(expr));
+
+    expr.eval(ctx)
+}
+
 impl Deref for Expr {
     type Target = [Token];
 
@@ -88,17 +92,99 @@ impl Deref for Expr {
     }
 }
 
+pub trait ExprContextProvider {
+    fn get_var(&self, name: &str) -> Option<f64>;
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprContext {
+    vars: BTreeMap<String, f64>,
+}
+
+impl ExprContext {
+    pub fn new() -> ExprContext {
+        let mut vars = BTreeMap::new();
+        vars.insert("pi".into(), consts::PI);
+        vars.insert("e".into(), consts::E);
+
+        ExprContext { vars: vars }
+    }
+
+    pub fn without_default() -> ExprContext {
+        ExprContext { vars: BTreeMap::new() }
+    }
+}
+
+impl Deref for ExprContext {
+    type Target = BTreeMap<String, f64>;
+    fn deref(&self) -> &BTreeMap<String, f64> {
+        &self.vars
+    }
+}
+
+impl DerefMut for ExprContext {
+    fn deref_mut(&mut self) -> &mut BTreeMap<String, f64> {
+        &mut self.vars
+    }
+}
+
+impl Default for ExprContext {
+    fn default() -> ExprContext {
+        ExprContext::new()
+    }
+}
+
+impl ExprContextProvider for ExprContext {
+    fn get_var(&self, name: &str) -> Option<f64> {
+        self.get(name).map(|f| *f)
+    }
+}
+
+impl<'a, T: ExprContextProvider> ExprContextProvider for &'a T {
+    fn get_var(&self, name: &str) -> Option<f64> {
+        (&**self).get_var(name)
+    }
+}
+
+macro_rules! arg {
+    () => {
+        $crate::ExprContext::new()
+    };
+
+    ($var:ident: $value:expr) => {
+        {
+            let mut ctx = $crate::ExprContext::new();
+            ctx.insert(stringify!($var).into(), $value);
+            ctx
+        }
+    };
+
+    ($($var:ident: $value:expr),*) => {
+        {
+            let mut ctx = $crate::ExprContext::new();
+            $(
+                ctx.insert(stringify!($var).into(), $value);
+            )*
+            ctx
+        }
+    };
+    ($($var:ident: $value:expr),*,) => {
+        arg!($($var: $value),*)
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use Error;
 
     #[test]
     fn test_eval() {
-        assert_eq!(Expr::from_str("2 + 3").unwrap().eval(), Ok(5.));
-        assert_eq!(Expr::from_str("2 + (3 + 4)").unwrap().eval(), Ok(9.));
-        assert_eq!(Expr::from_str("-2^(4 - 3) * (3 + 4)").unwrap().eval(),
-                   Ok(-14.));
-        assert_eq!(Expr::from_str("a + 3").unwrap().eval(),
-                   Err(ExprEvalError::UnknownVariable("a".into())));
+        assert_eq!(eval_str("2 + 3"), Ok(5.));
+        assert_eq!(eval_str("2 + (3 + 4)"), Ok(9.));
+        assert_eq!(eval_str("-2^(4 - 3) * (3 + 4)"), Ok(-14.));
+        assert_eq!(eval_str("a + 3"), Err(Error::UnknownVariable("a".into())));
+        assert_eq!(eval_str_with_context("a + 3", arg! {a: 2.}), Ok(5.));
+        assert_eq!(eval_str_with_context("hey ^ no", arg! {hey: 2., no: 8.}), Ok(256.));
     }
 }

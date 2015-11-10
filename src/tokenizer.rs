@@ -1,15 +1,34 @@
 use std::str::from_utf8;
 use nom::{IResult, Needed, alpha, multispace, slice_to_offsets};
 
-use Token;
-use Operation;
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParseError {
     UnexpectedToken(usize),
     MissingRParen(i32),
     MissingArgument,
     Unexpected,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum Operation {
+    Plus,
+    Minus,
+    Times,
+    Div,
+    Rem,
+    Pow,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Token {
+    Binary(Operation),
+    Unary(Operation),
+
+    LParen,
+    RParen,
+
+    Number(f64),
+    Var(String),
 }
 
 named!(binop<Token>, alt!(
@@ -182,7 +201,6 @@ pub fn tokenize<S: AsRef<str>>(input: S) -> Result<Vec<Token>, ParseError> {
 
 #[cfg(test)]
 mod tests {
-    use {Operation, Token};
     use super::*;
     use super::{number, float, binop, var};
     use nom::{IResult, Needed};
@@ -200,7 +218,6 @@ mod tests {
 
     #[test]
     fn test_number() {
-        use Token::*;
         use nom::IResult::*;
         use nom::ErrorKind::*;
         use nom::Err::*;
@@ -228,8 +245,8 @@ mod tests {
 
     #[test]
     fn test_tokenize() {
-        use Token::*;
-        use Operation::*;
+        use super::Token::*;
+        use super::Operation::*;
 
         assert_eq!(tokenize("2 +(3--2) "),
                    Ok(vec![Number(2f64),
