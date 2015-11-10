@@ -25,4 +25,6 @@ pub enum Token {
 
 pub mod tokenizer;
 pub mod shunting_yard;
-pub mod expr;
+mod expr;
+
+pub use expr::*;

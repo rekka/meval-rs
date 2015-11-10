@@ -17,7 +17,7 @@ impl Expr {
     pub fn from_str<S: AsRef<str>>(string: S) -> Result<Expr, String> {
         let tokens = try!(::tokenizer::tokenize(string));
 
-        let rpn = ::shunting_yard::to_rpn(&tokens);
+        let rpn = ::shunting_yard::to_rpn(&tokens).unwrap();
 
         Ok(Expr { rpn: rpn })
     }
