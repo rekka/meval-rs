@@ -28,3 +28,5 @@ pub mod shunting_yard;
 mod expr;
 
 pub use expr::*;
+pub use shunting_yard::RPNError;
+pub use tokenizer::ParseError;

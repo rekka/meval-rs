@@ -4,6 +4,14 @@ use nom::{IResult, Needed, alpha, multispace, slice_to_offsets};
 use Token;
 use Operation;
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum ParseError {
+    UnexpectedToken(usize),
+    MissingRParen(i32),
+    MissingArgument,
+    Unexpected,
+}
+
 named!(binop<Token>, alt!(
     chain!(tag!("+"),||{Token::Binary(Operation::Plus)}) |
     chain!(tag!("-"),||{Token::Binary(Operation::Minus)}) |
@@ -114,7 +122,7 @@ enum TokenizerState {
 }
 
 /// Tokenize a given mathematical expression.
-pub fn tokenize<S: AsRef<str>>(input: S) -> Result<Vec<Token>, String> {
+pub fn tokenize<S: AsRef<str>>(input: S) -> Result<Vec<Token>, ParseError> {
     use self::TokenizerState::*;
     use nom::IResult::*;
     use nom::Err;
@@ -157,17 +165,17 @@ pub fn tokenize<S: AsRef<str>>(input: S) -> Result<Vec<Token>, String> {
             }
             Error(Err::Position(_, p)) => {
                 let (i, _) = slice_to_offsets(input, p);
-                return Err(format!("Unexpected token at position {} ({:?})", i, from_utf8(p)));
+                return Err(ParseError::UnexpectedToken(i));
             }
             _ => {
-                return Err(format!("Unexpected token: {:?}", r));
+                return Err(ParseError::Unexpected);
             }
         }
     }
 
     match state {
-        (LExpr, _) => Err("Missing argument".into()),
-        (_, n_parens) if n_parens > 0 => Err(format!("Missing {} parentheses", n_parens)),
+        (LExpr, _) => Err(ParseError::MissingArgument),
+        (_, n_parens) if n_parens > 0 => Err(ParseError::MissingRParen(n_parens)),
         _ => Ok(res),
     }
 }
@@ -240,5 +248,9 @@ mod tests {
                            Var("abc".into()),
                            Binary(Times),
                            Number(12f64)]));
+
+        assert_eq!(tokenize("2)"), Err(ParseError::UnexpectedToken(1)));
+        assert_eq!(tokenize("2^"), Err(ParseError::MissingArgument));
+        assert_eq!(tokenize("(((2)"), Err(ParseError::MissingRParen(2)));
     }
 }

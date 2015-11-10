@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use Token;
+use {Token, ParseError, RPNError};
 
 /// Representain of an expression in the Reverse Polish notation form.
 pub struct Expr {
@@ -12,12 +12,26 @@ pub enum ExprEvalError {
     UnknownVariable(String),
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum ExprError {
+    ParseError(ParseError),
+    RPNError(RPNError),
+}
+
+impl From<ParseError> for ExprError {
+    fn from(err: ParseError) -> ExprError { ExprError::ParseError(err) }
+}
+
+impl From<RPNError> for ExprError {
+    fn from(err: RPNError) -> ExprError { ExprError::RPNError(err) }
+}
+
 impl Expr {
     /// Constructs an expression by parsing a string.
-    pub fn from_str<S: AsRef<str>>(string: S) -> Result<Expr, String> {
+    pub fn from_str<S: AsRef<str>>(string: S) -> Result<Expr, ExprError> {
         let tokens = try!(::tokenizer::tokenize(string));
 
-        let rpn = ::shunting_yard::to_rpn(&tokens).unwrap();
+        let rpn = try!(::shunting_yard::to_rpn(&tokens));
 
         Ok(Expr { rpn: rpn })
     }
