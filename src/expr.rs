@@ -30,12 +30,11 @@ impl Expr {
 
         for token in &self.rpn {
             match *token {
-                Var(ref n) =>
-                    if let Some(v) = ctx.get_var(n) {
-                        stack.push(v);
-                    } else {
-                        return Err(Error::UnknownVariable(n.clone()));
-                    },
+                Var(ref n) => if let Some(v) = ctx.get_var(n) {
+                    stack.push(v);
+                } else {
+                    return Err(Error::UnknownVariable(n.clone()));
+                },
                 Number(f) => stack.push(f),
                 Binary(op) => {
                     let right = stack.pop().unwrap();
@@ -78,7 +77,9 @@ pub fn eval_str<S: AsRef<str>>(expr: S) -> Result<f64, Error> {
 }
 
 /// Evaluate a string with default constants.
-pub fn eval_str_with_context<S: AsRef<str>, C: ExprContextProvider>(expr: S, ctx: C) -> Result<f64, Error> {
+pub fn eval_str_with_context<S: AsRef<str>, C: ExprContextProvider>(expr: S,
+                                                                    ctx: C)
+                                                                    -> Result<f64, Error> {
     let expr = try!(Expr::from_str(expr));
 
     expr.eval(ctx)
@@ -185,6 +186,7 @@ mod tests {
         assert_eq!(eval_str("-2^(4 - 3) * (3 + 4)"), Ok(-14.));
         assert_eq!(eval_str("a + 3"), Err(Error::UnknownVariable("a".into())));
         assert_eq!(eval_str_with_context("a + 3", arg! {a: 2.}), Ok(5.));
-        assert_eq!(eval_str_with_context("hey ^ no", arg! {hey: 2., no: 8.}), Ok(256.));
+        assert_eq!(eval_str_with_context("hey ^ no", arg! {hey: 2., no: 8.}),
+                   Ok(256.));
     }
 }

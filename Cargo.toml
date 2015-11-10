@@ -1,6 +1,6 @@
 [package]
 authors = ["Norbert Pozar <bertapozar@gmail.com>"]
-name = "expr_eval"
+name = "math_eval"
 version = "0.0.1"
 
 [dependencies]
