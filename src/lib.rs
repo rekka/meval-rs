@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate nom;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Operation {
     Plus,
     Minus,
@@ -11,7 +11,7 @@ pub enum Operation {
     Pow,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     Binary(Operation),
     Unary(Operation),
@@ -21,8 +21,7 @@ pub enum Token {
 
     Number(f64),
     Var(String),
-
-    Unknown,
 }
 
 pub mod tokenizer;
+pub mod shunting_yard;

@@ -157,9 +157,7 @@ pub fn tokenize<S: AsRef<str>>(input: S) -> Result<Vec<Token>, String> {
             }
             Error(Err::Position(_, p)) => {
                 let (i, _) = slice_to_offsets(input, p);
-                return Err(format!("Unexpected token at position {} ({:?})",
-                                   i,
-                                   from_utf8(p)));
+                return Err(format!("Unexpected token at position {} ({:?})", i, from_utf8(p)));
             }
             _ => {
                 return Err(format!("Unexpected token: {:?}", r));
