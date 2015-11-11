@@ -109,7 +109,7 @@ impl Expr {
     ///
     /// Returns `Err` if there is a variable in the expression that is not provided by the default
     /// context or `var`.
-    pub fn bind<'a>(&'a self, var: &str) -> Result<Box<Fn(f64) -> f64 + 'a>, Error> {
+    pub fn bind<'a>(self, var: &str) -> Result<Box<Fn(f64) -> f64 + 'a>, Error> {
         return self.bind_with_context(builtin(), var);
     }
 
@@ -119,7 +119,7 @@ impl Expr {
     ///
     /// Returns `Err` if there is a variable in the expression that is not provided by `ctx` or
     /// `var`.
-    pub fn bind_with_context<'a, C>(&'a self,
+    pub fn bind_with_context<'a, C>(self,
                                     ctx: C,
                                     var: &str)
                                     -> Result<Box<Fn(f64) -> f64 + 'a>, Error>
@@ -136,10 +136,7 @@ impl Expr {
     ///
     /// Returns `Err` if there is a variable in the expression that is not provided by the default
     /// context or `var`.
-    pub fn bind2<'a>(&'a self,
-                     var1: &str,
-                     var2: &str)
-                     -> Result<Box<Fn(f64, f64) -> f64 + 'a>, Error> {
+    pub fn bind2<'a>(self, var1: &str, var2: &str) -> Result<Box<Fn(f64, f64) -> f64 + 'a>, Error> {
         return self.bind_with_context2(builtin(), var1, var2);
     }
 
@@ -149,7 +146,7 @@ impl Expr {
     ///
     /// Returns `Err` if there is a variable in the expression that is not provided by `ctx` or
     /// `var`.
-    pub fn bind_with_context2<'a, C>(&'a self,
+    pub fn bind_with_context2<'a, C>(self,
                                      ctx: C,
                                      var1: &str,
                                      var2: &str)
@@ -312,10 +309,10 @@ mod tests {
     #[test]
     fn test_bind() {
         let expr = Expr::from_str("x + 3").unwrap();
-        let func = expr.bind("x").unwrap();
+        let func = expr.clone().bind("x").unwrap();
         assert_eq!(func(1.), 4.);
 
-        assert_eq!(expr.bind("y").err(),
+        assert_eq!(expr.clone().bind("y").err(),
                    Some(Error::UnknownVariable("x".into())));
 
         let ctx = (("x", 2.), builtin());
@@ -323,9 +320,9 @@ mod tests {
         assert_eq!(func(1.), 5.);
 
         let expr = Expr::from_str("x + y + 2.").unwrap();
-        let func = expr.bind2("x", "y").unwrap();
+        let func = expr.clone().bind2("x", "y").unwrap();
         assert_eq!(func(1., 2.), 5.);
-        assert_eq!(expr.bind2("z", "y").err(),
+        assert_eq!(expr.clone().bind2("z", "y").err(),
                    Some(Error::UnknownVariable("x".into())));
         assert_eq!(expr.bind2("x", "z").err(),
                    Some(Error::UnknownVariable("y".into())));
