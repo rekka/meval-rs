@@ -1,8 +1,7 @@
 # meval-rs
 
-This [Rust] crate provides a simple math expression parser. Its main
-goal is to be convenient to use by default, while allowing for some
-flexibility.
+This [Rust] crate provides a simple math expression parser. Its main goal is to be convenient
+to use by default, while allowing for some flexibility.
 
 For other similar projects see:
 
@@ -20,7 +19,8 @@ fn main() {
 }
 ```
 
-Need to define a rust function from an expression? No problem:
+Need to define a Rust function from an expression? No problem, use [`Expr`](struct.Expr.html)
+for this and more:
 
 ```rust
 extern crate meval;
@@ -35,6 +35,23 @@ fn main() {
 }
 ```
 
+## Supported expressions
+
+`meval` supports basic mathematical operations on floating point numbers:
+
+- binary operators: `+`, `-`, `*`, `/`, `^` (power)
+- unary operators: `-`, `+`
+
+Build-in functions currently supported (implemented using functions of the same name in [Rust
+std library][std-float]):
+
+- `sqrt`, `abs`
+- `exp`, `ln`
+- `sin`, `cos`, `tan`, `asin`, `acos`, `atan`
+- `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`
+- `floor`, `ceil`, `round`
+- `signum`
 
 [Rust]: https://www.rust-lang.org/
+[std-float]: http://doc.rust-lang.org/stable/std/primitive.f64.html
 

@@ -1,6 +1,5 @@
-//! This [Rust] crate provides a simple math expression parser. Its main
-//! goal is to be convenient to use by default, while allowing for some
-//! flexibility.
+//! This [Rust] crate provides a simple math expression parser. Its main goal is to be convenient
+//! to use by default, while allowing for some flexibility.
 //!
 //! For other similar projects see:
 //!
@@ -18,7 +17,8 @@
 //! }
 //! ```
 //!
-//! Need to define a rust function from an expression? No problem:
+//! Need to define a Rust function from an expression? No problem, use [`Expr`](struct.Expr.html)
+//! for this and more:
 //!
 //! ```rust
 //! extern crate meval;
@@ -33,8 +33,26 @@
 //! }
 //! ```
 //!
-//! [Rust]: https://www.rust-lang.org/
+//! ## Supported expressions
 //!
+//! `meval` supports basic mathematical operations on floating point numbers:
+//!
+//! - binary operators: `+`, `-`, `*`, `/`, `^` (power)
+//! - unary operators: `-`, `+`
+//!
+//! Build-in functions currently supported (implemented using functions of the same name in [Rust
+//! std library][std-float]):
+//!
+//! - `sqrt`, `abs`
+//! - `exp`, `ln`
+//! - `sin`, `cos`, `tan`, `asin`, `acos`, `atan`
+//! - `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`
+//! - `floor`, `ceil`, `round`
+//! - `signum`
+//!
+//! [Rust]: https://www.rust-lang.org/
+//! [std-float]: http://doc.rust-lang.org/stable/std/primitive.f64.html
+
 #[macro_use]
 extern crate nom;
 
@@ -48,11 +66,14 @@ pub use expr::*;
 pub use shunting_yard::RPNError;
 pub use tokenizer::ParseError;
 
+/// An error produced during parsing or evaluation.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     UnknownVariable(String),
     UnknownFunction(String),
+    /// An error returned by the parser.
     ParseError(ParseError),
+    /// The shunting-yard algorithm returned an error.
     RPNError(RPNError),
 }
 

@@ -1,14 +1,28 @@
+//! Tokenizer that converts a mathematical expression in a string form into a series of `Token`s.
+//!
+//! The underlying parser is build using the [nom] parser combinator crate.
+//!
+//! The parser should tokenize only well-formed expressions.
+//!
+//! [nom]: https://crates.io/crates/nom
 use std::str::from_utf8;
 use nom::{IResult, Needed, alpha, multispace, slice_to_offsets};
 
+/// An error reported by the parser.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParseError {
+    /// A token that is not allowed at the given location (contains the location of the offending
+    /// character in the source string).
     UnexpectedToken(usize),
+    /// Missing right parentheses at the end of the source string (contains the number of missing
+    /// parens).
     MissingRParen(i32),
+    /// Missing operator or function argument at the end of the expression.
     MissingArgument,
     Unexpected,
 }
 
+/// Mathematical operations.
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Operation {
     Plus,
@@ -19,16 +33,24 @@ pub enum Operation {
     Pow,
 }
 
+/// Expression tokens.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
+    /// Binary operation.
     Binary(Operation),
+    /// Unary operation.
     Unary(Operation),
 
+    /// Left parenthesis.
     LParen,
+    /// Right parenthesis.
     RParen,
 
+    /// A number.
     Number(f64),
+    /// A variable.
     Var(String),
+    /// A function.
     Func(String),
 }
 
@@ -63,7 +85,7 @@ named!(var<Token>, map!(map_res!(alpha, from_utf8), |s: &str| Token::Var(s.into(
 /// Matches one or more digit characters `0`...`9`.
 ///
 /// Fix of IMHO broken `nom::digit`.
-pub fn digit_fixed(input: &[u8]) -> IResult<&[u8], &[u8]> {
+fn digit_fixed(input: &[u8]) -> IResult<&[u8], &[u8]> {
     use nom::IResult::*;
     use nom::{Needed, is_digit, ErrorKind};
     use nom::Err::*;
@@ -150,6 +172,12 @@ enum TokenizerState {
 }
 
 /// Tokenize a given mathematical expression.
+///
+/// The parser should return `Ok` only if the expression is well-formed.
+///
+/// # Failure
+///
+/// Returns `Err` if the expression is not well-formed.
 pub fn tokenize<S: AsRef<str>>(input: S) -> Result<Vec<Token>, ParseError> {
     use self::TokenizerState::*;
     use nom::IResult::*;

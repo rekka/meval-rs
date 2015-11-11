@@ -1,3 +1,11 @@
+//! Implementation of the shunting-yard algorithm for converting an infix expression to an
+//! expression in reverse Polish notation (RPN).
+//!
+//! See the Wikipedia articles on the [shunting-yard algorithm][shunting] and on [reverse Polish
+//! notation][RPN] for more details.
+//!
+//! [RPN]: https://en.wikipedia.org/wiki/Reverse_Polish_notation
+//! [shunting]: https://en.wikipedia.org/wiki/Shunting-yard_algorithm
 use tokenizer::Token;
 
 #[derive(Debug, Clone, Copy)]
@@ -7,15 +15,20 @@ enum Associativity {
     NA,
 }
 
+/// An error produced by the shunting-yard algorightm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RPNError {
+    /// An extra left parenthesis was found.
     MismatchedLParen(usize),
+    /// An extra right parenthesis was found.
     MismatchedRParen(usize),
+    /// Too few operands for some operator.
     NotEnoughOperands(usize),
+    /// Too many operands reported.
     TooManyOperands,
 }
 
-/// Return operator precedence and associativity for a given token.
+/// Returns the operator precedence and associativity for a given token.
 fn prec_assoc(token: &Token) -> (u32, Associativity) {
     use self::Associativity::*;
     use tokenizer::Token::*;
@@ -38,8 +51,11 @@ fn prec_assoc(token: &Token) -> (u32, Associativity) {
     }
 }
 
-
-/// Convert a tokenized infix expression to a Reverse Polish notation.
+/// Converts a tokenized infix expression to reverse Polish notation.
+///
+/// # Failure
+///
+/// Returns `Err` if the input expression is not well-formed.
 pub fn to_rpn(input: &[Token]) -> Result<Vec<Token>, RPNError> {
     use tokenizer::Token::*;
 
