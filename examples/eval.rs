@@ -12,7 +12,7 @@ fn main() {
     if args.len() == 0 {
         println!("{}", USAGE);
     }
-    for arg in args.skip(1) {
+    for arg in args {
         match eval_str(&arg) {
             Ok(f) => println!("{} = {}", arg, f),
             Err(e) => println!("Error when evaluating `{}`: {}", arg, e),
