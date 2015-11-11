@@ -6,7 +6,7 @@ use Error;
 use tokenizer::{Token, tokenize};
 use shunting_yard::to_rpn;
 
-/// Representain of an expression in the Reverse Polish notation form.
+/// Representain of an expression.
 #[derive(Debug, Clone)]
 pub struct Expr {
     rpn: Vec<Token>,
@@ -23,7 +23,7 @@ impl Expr {
     }
 
     /// Evaluates the expression with variables given by the argument.
-    pub fn eval<C: ExprContextProvider>(&self, ctx: C) -> Result<f64, Error> {
+    pub fn eval<C: Context>(&self, ctx: C) -> Result<f64, Error> {
         use tokenizer::Token::*;
         use tokenizer::Operation::*;
 
@@ -96,6 +96,12 @@ impl Expr {
         Ok(r)
     }
 
+    /// Create a function of one variable based on this expression, with default constants.
+    ///
+    /// # Failure
+    ///
+    /// Returns `Err` if there is a variable in the expression that is not provided by the default
+    /// context or `var`.
     pub fn bind<'a>(&'a self, var: &str) -> Result<Box<Fn(f64) -> f64 + 'a>, Error> {
         return self.bind_with_context(ExprContext::new(), var);
     }
@@ -110,17 +116,50 @@ impl Expr {
                                     ctx: C,
                                     var: &str)
                                     -> Result<Box<Fn(f64) -> f64 + 'a>, Error>
-        where C: ExprContextProvider + 'a
+        where C: Context + 'a
     {
         try!(self.check_vars(((var, 0.), &ctx)));
         let var = var.to_owned();
         return Ok(Box::new(move |x| self.eval(((&var, x), &ctx)).expect("Expr::bind")));
     }
 
+    /// Create a function of two variables based on this expression, with default constants.
+    ///
+    /// # Failure
+    ///
+    /// Returns `Err` if there is a variable in the expression that is not provided by the default
+    /// context or `var`.
+    pub fn bind2<'a>(&'a self,
+                     var1: &str,
+                     var2: &str)
+                     -> Result<Box<Fn(f64, f64) -> f64 + 'a>, Error> {
+        return self.bind_with_context2(ExprContext::new(), var1, var2);
+    }
+
+    /// Create a function of two variables based on this expression.
+    ///
+    /// # Failure
+    ///
+    /// Returns `Err` if there is a variable in the expression that is not provided by `ctx` or
+    /// `var`.
+    pub fn bind_with_context2<'a, C>(&'a self,
+                                     ctx: C,
+                                     var1: &str,
+                                     var2: &str)
+                                     -> Result<Box<Fn(f64, f64) -> f64 + 'a>, Error>
+        where C: Context + 'a
+    {
+        try!(self.check_vars(([(var1, 0.), (var2, 0.)], &ctx)));
+        let var1 = var1.to_owned();
+        let var2 = var2.to_owned();
+        return Ok(Box::new(move |x, y| {
+            self.eval(([(&var1, x), (&var2, y)], &ctx)).expect("Expr::bind")
+        }));
+    }
     /// Check that every variable in the expression is given by the context `ctx`.
     ///
-    /// Returns an error if a missing variable is detected.
-    fn check_vars<C: ExprContextProvider>(&self, ctx: C) -> Result<(), Error> {
+    /// Returns `Err` if a missing variable is detected.
+    fn check_vars<C: Context>(&self, ctx: C) -> Result<(), Error> {
         for t in self.rpn.iter() {
             if let &Token::Var(ref name) = t {
                 if ctx.get_var(name).is_none() {
@@ -140,9 +179,7 @@ pub fn eval_str<S: AsRef<str>>(expr: S) -> Result<f64, Error> {
 }
 
 /// Evaluate a string with default constants.
-pub fn eval_str_with_context<S: AsRef<str>, C: ExprContextProvider>(expr: S,
-                                                                    ctx: C)
-                                                                    -> Result<f64, Error> {
+pub fn eval_str_with_context<S: AsRef<str>, C: Context>(expr: S, ctx: C) -> Result<f64, Error> {
     let expr = try!(Expr::from_str(expr));
 
     expr.eval(ctx)
@@ -156,7 +193,7 @@ impl Deref for Expr {
     }
 }
 
-pub trait ExprContextProvider {
+pub trait Context {
     fn get_var(&self, name: &str) -> Option<f64>;
 }
 
@@ -198,31 +235,42 @@ impl Default for ExprContext {
     }
 }
 
-impl ExprContextProvider for ExprContext {
+impl Context for ExprContext {
     fn get_var(&self, name: &str) -> Option<f64> {
         self.get(name).map(|f| *f)
     }
 }
 
-impl<'a, T: ExprContextProvider> ExprContextProvider for &'a T {
+impl<'a, T: Context> Context for &'a T {
     fn get_var(&self, name: &str) -> Option<f64> {
         (&**self).get_var(name)
     }
 }
 
-impl<T: ExprContextProvider, S: ExprContextProvider> ExprContextProvider for (T, S) {
+impl<T: Context, S: Context> Context for (T, S) {
     fn get_var(&self, name: &str) -> Option<f64> {
         self.0.get_var(name).or_else(|| self.1.get_var(name))
     }
 }
 
-impl<S: AsRef<str>> ExprContextProvider for (S, f64) {
+impl<S: AsRef<str>> Context for (S, f64) {
     fn get_var(&self, name: &str) -> Option<f64> {
         if self.0.as_ref() == name {
             Some(self.1)
         } else {
             None
         }
+    }
+}
+
+impl<S: AsRef<str>> Context for [(S, f64); 2] {
+    fn get_var(&self, name: &str) -> Option<f64> {
+        for &(ref n, v) in self.iter() {
+            if n.as_ref() == name {
+                return Some(v);
+            }
+        }
+        None
     }
 }
 
@@ -279,5 +327,17 @@ mod tests {
 
         assert_eq!(expr.bind("y").err(),
                    Some(Error::UnknownVariable("x".into())));
+
+        let ctx = (("x", 2.), ExprContext::new());
+        let func = expr.bind_with_context(&ctx, "y").unwrap();
+        assert_eq!(func(1.), 5.);
+
+        let expr = Expr::from_str("x + y + 2.").unwrap();
+        let func = expr.bind2("x", "y").unwrap();
+        assert_eq!(func(1., 2.), 5.);
+        assert_eq!(expr.bind2("z", "y").err(),
+                   Some(Error::UnknownVariable("x".into())));
+        assert_eq!(expr.bind2("x", "z").err(),
+                   Some(Error::UnknownVariable("y".into())));
     }
 }
