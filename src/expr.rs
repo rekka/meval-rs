@@ -105,6 +105,8 @@ impl Expr {
 
     /// Creates a function of one variable based on this expression, with default constants.
     ///
+    /// Binds the input of the returned closure to `var`.
+    ///
     /// # Failure
     ///
     /// Returns `Err` if there is a variable in the expression that is not provided by the default
@@ -114,6 +116,8 @@ impl Expr {
     }
 
     /// Creates a function of one variable based on this expression.
+    ///
+    /// Binds the input of the returned closure to `var`.
     ///
     /// # Failure
     ///
@@ -132,6 +136,8 @@ impl Expr {
 
     /// Creates a function of two variables based on this expression, with default constants.
     ///
+    /// Binds the inputs of the returned closure to `var1` and `var2`.
+    ///
     /// # Failure
     ///
     /// Returns `Err` if there is a variable in the expression that is not provided by the default
@@ -141,6 +147,8 @@ impl Expr {
     }
 
     /// Creates a function of two variables based on this expression.
+    ///
+    /// Binds the inputs of the returned closure to `var1` and `var2`.
     ///
     /// # Failure
     ///
@@ -163,15 +171,23 @@ impl Expr {
 
     /// Creates a function of three variables based on this expression, with default constants.
     ///
+    /// Binds the inputs of the returned closure to `var1`, `var2` and `var3`.
+    ///
     /// # Failure
     ///
     /// Returns `Err` if there is a variable in the expression that is not provided by the default
     /// context or `var`.
-    pub fn bind3<'a>(self, var1: &str, var2: &str, var3: &str) -> Result<Box<Fn(f64, f64, f64) -> f64 + 'a>, Error> {
+    pub fn bind3<'a>(self,
+                     var1: &str,
+                     var2: &str,
+                     var3: &str)
+                     -> Result<Box<Fn(f64, f64, f64) -> f64 + 'a>, Error> {
         return self.bind3_with_context(builtin(), var1, var2, var3);
     }
 
     /// Creates a function of three variables based on this expression.
+    ///
+    /// Binds the inputs of the returned closure to `var1`, `var2` and `var3`.
     ///
     /// # Failure
     ///

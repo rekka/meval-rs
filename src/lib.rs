@@ -1,9 +1,5 @@
 //! This [Rust] crate provides a simple math expression parser. Its main goal is to be convenient
-//! to use by default, while allowing for some flexibility.
-//!
-//! For other similar projects see:
-//!
-//! - [rodolf0/tox](https://github.com/rodolf0/tox)
+//! to use, while allowing for some flexibility.
 //!
 //! ## Simple examples
 //!
@@ -38,7 +34,7 @@
 //! `meval` supports basic mathematical operations on floating point numbers:
 //!
 //! - binary operators: `+`, `-`, `*`, `/`, `^` (power)
-//! - unary operators: `-`, `+`
+//! - unary operators: `+`, `-`
 //!
 //! Build-in functions currently supported (implemented using functions of the same name in [Rust
 //! std library][std-float]):
@@ -49,6 +45,18 @@
 //! - `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`
 //! - `floor`, `ceil`, `round`
 //! - `signum`
+//!
+//! Build-in constants:
+//!
+//! - `pi`
+//! - `e`
+//!
+//! ## Related projects
+//!
+//! This is a toy project of mine for learning Rust, and to be hopefully useful when writing
+//! command line scripts. For other similar projects see:
+//!
+//! - [rodolf0/tox](https://github.com/rodolf0/tox)
 //!
 //! [Rust]: https://www.rust-lang.org/
 //! [std-float]: http://doc.rust-lang.org/stable/std/primitive.f64.html
