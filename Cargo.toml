@@ -1,7 +1,10 @@
 [package]
 authors = ["Norbert Pozar <bertapozar@gmail.com>"]
-name = "math_eval"
+name = "meval"
+description = "A simple math expression parser and evaluator."
 version = "0.0.1"
+license = "MIT"
+keywords = ["math", "parser", "expression", "formula", "evaluator"]
 
 [dependencies]
 

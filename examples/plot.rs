@@ -1,9 +1,9 @@
-extern crate math_eval;
+extern crate meval;
 extern crate gnuplot;
 
 use std::env::args;
 use gnuplot::{Figure, Caption};
-use math_eval::Expr;
+use meval::Expr;
 
 const USAGE: &'static str = r"Plot functions of variable `x`.
 
