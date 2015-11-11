@@ -7,6 +7,7 @@ use tokenizer::{Token, tokenize};
 use shunting_yard::to_rpn;
 
 /// Representain of an expression in the Reverse Polish notation form.
+#[derive(Debug, Clone)]
 pub struct Expr {
     rpn: Vec<Token>,
 }
@@ -94,6 +95,41 @@ impl Expr {
         }
         Ok(r)
     }
+
+    pub fn bind<'a>(&'a self, var: &str) -> Result<Box<Fn(f64) -> f64 + 'a>, Error> {
+        return self.bind_with_context(ExprContext::new(), var);
+    }
+
+    /// Create a function of one variable based on this expression.
+    ///
+    /// # Failure
+    ///
+    /// Returns `Err` if there is a variable in the expression that is not provided by `ctx` or
+    /// `var`.
+    pub fn bind_with_context<'a, C>(&'a self,
+                                    ctx: C,
+                                    var: &str)
+                                    -> Result<Box<Fn(f64) -> f64 + 'a>, Error>
+        where C: ExprContextProvider + 'a
+    {
+        try!(self.check_vars(((var, 0.), &ctx)));
+        let var = var.to_owned();
+        return Ok(Box::new(move |x| self.eval(((&var, x), &ctx)).expect("Expr::bind")));
+    }
+
+    /// Check that every variable in the expression is given by the context `ctx`.
+    ///
+    /// Returns an error if a missing variable is detected.
+    fn check_vars<C: ExprContextProvider>(&self, ctx: C) -> Result<(), Error> {
+        for t in self.rpn.iter() {
+            if let &Token::Var(ref name) = t {
+                if ctx.get_var(name).is_none() {
+                    return Err(Error::UnknownVariable(name.clone()));
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Evaluate a string with default constants.
@@ -174,6 +210,22 @@ impl<'a, T: ExprContextProvider> ExprContextProvider for &'a T {
     }
 }
 
+impl<T: ExprContextProvider, S: ExprContextProvider> ExprContextProvider for (T, S) {
+    fn get_var(&self, name: &str) -> Option<f64> {
+        self.0.get_var(name).or_else(|| self.1.get_var(name))
+    }
+}
+
+impl<S: AsRef<str>> ExprContextProvider for (S, f64) {
+    fn get_var(&self, name: &str) -> Option<f64> {
+        if self.0.as_ref() == name {
+            Some(self.1)
+        } else {
+            None
+        }
+    }
+}
+
 macro_rules! arg {
     () => {
         $crate::ExprContext::new()
@@ -217,5 +269,15 @@ mod tests {
                    Ok(256.));
         assert_eq!(eval_str("round(sin (pi) * cos(0))"), Ok(0.));
         assert_eq!(eval_str("round( sqrt(3^2 + 4^2)) "), Ok(5.));
+    }
+
+    #[test]
+    fn test_bind() {
+        let expr = Expr::from_str("x + 3").unwrap();
+        let func = expr.bind("x").unwrap();
+        assert_eq!(func(1.), 4.);
+
+        assert_eq!(expr.bind("y").err(),
+                   Some(Error::UnknownVariable("x".into())));
     }
 }

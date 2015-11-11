@@ -4,4 +4,9 @@ name = "math_eval"
 version = "0.0.1"
 
 [dependencies]
-nom = { git = "https://github.com/Geal/nom.git" }
+
+[dependencies.nom]
+git = "https://github.com/Geal/nom.git"
+
+[dev-dependencies]
+gnuplot = "0.0.18"
