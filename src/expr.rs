@@ -137,7 +137,7 @@ impl Expr {
     /// Returns `Err` if there is a variable in the expression that is not provided by the default
     /// context or `var`.
     pub fn bind2<'a>(self, var1: &str, var2: &str) -> Result<Box<Fn(f64, f64) -> f64 + 'a>, Error> {
-        return self.bind_with_context2(builtin(), var1, var2);
+        return self.bind2_with_context(builtin(), var1, var2);
     }
 
     /// Creates a function of two variables based on this expression.
@@ -146,7 +146,7 @@ impl Expr {
     ///
     /// Returns `Err` if there is a variable in the expression that is not provided by `ctx` or
     /// `var`.
-    pub fn bind_with_context2<'a, C>(self,
+    pub fn bind2_with_context<'a, C>(self,
                                      ctx: C,
                                      var1: &str,
                                      var2: &str)
@@ -157,7 +157,40 @@ impl Expr {
         let var1 = var1.to_owned();
         let var2 = var2.to_owned();
         return Ok(Box::new(move |x, y| {
-            self.eval(([(&var1, x), (&var2, y)], &ctx)).expect("Expr::bind")
+            self.eval(([(&var1, x), (&var2, y)], &ctx)).expect("Expr::bind2")
+        }));
+    }
+
+    /// Creates a function of three variables based on this expression, with default constants.
+    ///
+    /// # Failure
+    ///
+    /// Returns `Err` if there is a variable in the expression that is not provided by the default
+    /// context or `var`.
+    pub fn bind3<'a>(self, var1: &str, var2: &str, var3: &str) -> Result<Box<Fn(f64, f64, f64) -> f64 + 'a>, Error> {
+        return self.bind3_with_context(builtin(), var1, var2, var3);
+    }
+
+    /// Creates a function of three variables based on this expression.
+    ///
+    /// # Failure
+    ///
+    /// Returns `Err` if there is a variable in the expression that is not provided by `ctx` or
+    /// `var`.
+    pub fn bind3_with_context<'a, C>(self,
+                                     ctx: C,
+                                     var1: &str,
+                                     var2: &str,
+                                     var3: &str)
+                                     -> Result<Box<Fn(f64, f64, f64) -> f64 + 'a>, Error>
+        where C: Context + 'a
+    {
+        try!(self.check_vars(([(var1, 0.), (var2, 0.), (var3, 0.)], &ctx)));
+        let var1 = var1.to_owned();
+        let var2 = var2.to_owned();
+        let var3 = var3.to_owned();
+        return Ok(Box::new(move |x, y, z| {
+            self.eval(([(&var1, x), (&var2, y), (&var3, z)], &ctx)).expect("Expr::bind3")
         }));
     }
 
@@ -250,15 +283,26 @@ impl<S: AsRef<str>> Context for (S, f64) {
     }
 }
 
-impl<S: AsRef<str>> Context for [(S, f64); 2] {
-    fn get_var(&self, name: &str) -> Option<f64> {
-        for &(ref n, v) in self.iter() {
-            if n.as_ref() == name {
-                return Some(v);
+// macro for implementing Context for arrays
+macro_rules! array_impls {
+    ($($N:expr)+) => {
+        $(
+            impl<S: AsRef<str>> Context for [(S, f64); $N] {
+                fn get_var(&self, name: &str) -> Option<f64> {
+                    for &(ref n, v) in self.iter() {
+                        if n.as_ref() == name {
+                            return Some(v);
+                        }
+                    }
+                    None
+                }
             }
-        }
-        None
+        )+
     }
+}
+
+array_impls! {
+    0 1 2 3 4 5 6 7 8
 }
 
 macro_rules! arg {
@@ -326,5 +370,9 @@ mod tests {
                    Some(Error::UnknownVariable("x".into())));
         assert_eq!(expr.bind2("x", "z").err(),
                    Some(Error::UnknownVariable("y".into())));
+
+        let expr = Expr::from_str("x + y^2 + z^3").unwrap();
+        let func = expr.clone().bind3("x", "y", "z").unwrap();
+        assert_eq!(func(1., 2., 3.), 32.);
     }
 }
