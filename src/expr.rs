@@ -57,6 +57,33 @@ impl Expr {
                         _ => panic!("Unimplement unary operation: {:?}", op),
                     }
                 }
+                Func(ref n) => {
+                    let arg = stack.pop().unwrap();
+                    let r = match n.as_ref() {
+                        "sqrt" => arg.sqrt(),
+                        "exp" => arg.exp(),
+                        "ln" => arg.ln(),
+                        "abs" => arg.abs(),
+                        "sin" => arg.sin(),
+                        "cos" => arg.cos(),
+                        "tan" => arg.tan(),
+                        "asin" => arg.asin(),
+                        "acos" => arg.acos(),
+                        "atan" => arg.atan(),
+                        "sinh" => arg.sinh(),
+                        "cosh" => arg.cosh(),
+                        "tanh" => arg.tanh(),
+                        "asinh" => arg.asinh(),
+                        "acosh" => arg.acosh(),
+                        "atanh" => arg.atanh(),
+                        "floor" => arg.floor(),
+                        "ceil" => arg.ceil(),
+                        "round" => arg.round(),
+                        "signum" => arg.signum(),
+                        _ => return Err(Error::UnknownFunction(n.clone())),
+                    };
+                    stack.push(r);
+                }
                 _ => panic!("Unrecognized token: {:?}", token),
             }
         }
@@ -188,5 +215,7 @@ mod tests {
         assert_eq!(eval_str_with_context("a + 3", arg! {a: 2.}), Ok(5.));
         assert_eq!(eval_str_with_context("hey ^ no", arg! {hey: 2., no: 8.}),
                    Ok(256.));
+        assert_eq!(eval_str("round(sin (pi) * cos(0))"), Ok(0.));
+        assert_eq!(eval_str("round( sqrt(3^2 + 4^2)) "), Ok(5.));
     }
 }

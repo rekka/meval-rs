@@ -29,6 +29,7 @@ pub enum Token {
 
     Number(f64),
     Var(String),
+    Func(String),
 }
 
 named!(binop<Token>, alt!(
@@ -48,6 +49,14 @@ named!(unop<Token>, alt!(
 
 named!(lparen<Token>, chain!(tag!("("),||{Token::LParen}));
 named!(rparen<Token>, chain!(tag!(")"),||{Token::RParen}));
+
+/// Parse `func(`, returns `func`.
+named!(func<Token>, map!(map_res!(
+            terminated!(alpha,
+                        preceded!(opt!(multispace), tag!("("))), from_utf8),
+            |s: &str| Token::Func(s.into())
+            )
+      );
 
 named!(var<Token>, map!(map_res!(alpha, from_utf8), |s: &str| Token::Var(s.into())));
 
@@ -123,7 +132,7 @@ fn number(input: &[u8]) -> IResult<&[u8], Token> {
 }
 
 named!(lexpr<Token>, delimited!(opt!(multispace),
-                                alt!(number | var | unop | lparen),
+                                alt!(number | complete!(func) | var | unop | lparen),
                                 opt!(multispace)));
 named!(after_rexpr<Token>, delimited!(opt!(multispace),
                                       alt!(binop | rparen),
@@ -145,7 +154,9 @@ pub fn tokenize<S: AsRef<str>>(input: S) -> Result<Vec<Token>, ParseError> {
     use self::TokenizerState::*;
     use nom::IResult::*;
     use nom::Err;
-    let mut state = (LExpr, 0);
+    let mut state = LExpr;
+    // number of function arguments left
+    let mut paren_stack = vec![];
 
     let mut res = vec![];
 
@@ -154,28 +165,28 @@ pub fn tokenize<S: AsRef<str>>(input: S) -> Result<Vec<Token>, ParseError> {
 
     while !s.is_empty() {
         let r = match state {
-            (LExpr, _) => lexpr(s),
-            (AfterRExpr, 0) => after_rexpr_no_paren(s),
-            (AfterRExpr, _) => after_rexpr(s),
+            LExpr => lexpr(s),
+            AfterRExpr if paren_stack.is_empty() => after_rexpr_no_paren(s),
+            AfterRExpr => after_rexpr(s),
         };
 
         match r {
             Done(m, t) => {
                 match t {
-                    Token::LParen => {
-                        state.1 += 1;
+                    Token::LParen | Token::Func(_) => {
+                        paren_stack.push(0);
                     }
                     Token::RParen => {
-                        state.1 -= 1;
+                        paren_stack.pop().expect("The paren_stack is empty!");
                     }
                     Token::Var(_) => {
-                        state.0 = AfterRExpr;
+                        state = AfterRExpr;
                     }
                     Token::Number(_) => {
-                        state.0 = AfterRExpr;
+                        state = AfterRExpr;
                     }
                     Token::Binary(_) => {
-                        state.0 = LExpr;
+                        state = LExpr;
                     }
                     _ => {}
                 }
@@ -187,14 +198,17 @@ pub fn tokenize<S: AsRef<str>>(input: S) -> Result<Vec<Token>, ParseError> {
                 return Err(ParseError::UnexpectedToken(i));
             }
             _ => {
-                return Err(ParseError::Unexpected);
+                panic!("Unexpected parse result when parsing `{}` at `{}`: {:?}",
+                       String::from_utf8_lossy(input),
+                       String::from_utf8_lossy(s),
+                       r);
             }
         }
     }
 
     match state {
-        (LExpr, _) => Err(ParseError::MissingArgument),
-        (_, n_parens) if n_parens > 0 => Err(ParseError::MissingRParen(n_parens)),
+        LExpr => Err(ParseError::MissingArgument),
+        _ if !paren_stack.is_empty() => Err(ParseError::MissingRParen(paren_stack.len() as i32)),
         _ => Ok(res),
     }
 }
@@ -202,18 +216,21 @@ pub fn tokenize<S: AsRef<str>>(input: S) -> Result<Vec<Token>, ParseError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::{number, float, binop, var};
+    use super::{number, binop, var, func};
     use nom::{IResult, Needed};
 
     #[test]
     fn it_works() {
-        println!("{:?}", float(b"32143"));
         assert_eq!(binop(b"+"),
                    IResult::Done(&b""[..], Token::Binary(Operation::Plus)));
         assert_eq!(number(b"32143"),
                    IResult::Done(&b""[..], Token::Number(32143f64)));
         assert_eq!(var(b"abc"),
                    IResult::Done(&b""[..], Token::Var("abc".into())));
+        assert_eq!(func(b"abc("),
+                   IResult::Done(&b""[..], Token::Func("abc".into())));
+        assert_eq!(func(b"abc ("),
+                   IResult::Done(&b""[..], Token::Func("abc".into())));
     }
 
     #[test]
@@ -248,6 +265,8 @@ mod tests {
         use super::Token::*;
         use super::Operation::*;
 
+        assert_eq!(tokenize("a"), Ok(vec![Var("a".into())]));
+
         assert_eq!(tokenize("2 +(3--2) "),
                    Ok(vec![Number(2f64),
                            Binary(Plus),
@@ -266,6 +285,20 @@ mod tests {
                            Binary(Times),
                            Number(12f64)]));
 
+        assert_eq!(tokenize("-sin(pi * 3)^ cos(2)"),
+                   Ok(vec![Unary(Minus),
+                           Func("sin".into()),
+                           Var("pi".into()),
+                           Binary(Times),
+                           Number(3f64),
+                           RParen,
+                           Binary(Pow),
+                           Func("cos".into()),
+                           Number(2f64),
+                           RParen,
+                           ]));
+
+        assert_eq!(tokenize(""), Err(ParseError::MissingArgument));
         assert_eq!(tokenize("2)"), Err(ParseError::UnexpectedToken(1)));
         assert_eq!(tokenize("2^"), Err(ParseError::MissingArgument));
         assert_eq!(tokenize("(((2)"), Err(ParseError::MissingRParen(2)));

@@ -14,6 +14,7 @@ pub use tokenizer::ParseError;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     UnknownVariable(String),
+    UnknownFunction(String),
     ParseError(ParseError),
     RPNError(RPNError),
 }
@@ -23,6 +24,8 @@ impl fmt::Display for Error {
         match *self {
             Error::UnknownVariable(ref name) =>
                 write!(f, "Evaluation error: unknown variable `{}`", name),
+            Error::UnknownFunction(ref name) =>
+                write!(f, "Evaluation error: unknown function `{}`", name),
             Error::ParseError(ref e) => write!(f, "Parse error: {:?}", e),
             Error::RPNError(ref e) => write!(f, "RPN error: {:?}", e),
         }

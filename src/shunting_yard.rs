@@ -34,7 +34,7 @@ fn prec_assoc(token: &Token) -> (u32, Associativity) {
                 _ => unimplemented!(),
             }
         }
-        Var(_) | Number(_) | LParen | RParen => (0, NA),
+        Var(_) | Number(_) | Func(_) | LParen | RParen => (0, NA),
     }
 }
 
@@ -78,6 +78,11 @@ pub fn to_rpn(input: &[Token]) -> Result<Vec<Token>, RPNError> {
                             found = true;
                             break;
                         }
+                        Func(_) => {
+                            found = true;
+                            output.push(t);
+                            break;
+                        }
                         _ => output.push(t),
                     }
                 }
@@ -85,13 +90,14 @@ pub fn to_rpn(input: &[Token]) -> Result<Vec<Token>, RPNError> {
                     return Err(RPNError::MismatchedRParen(index));
                 }
             }
+            Func(_) => stack.push((index, token)),
         }
     }
 
     while let Some((index, token)) = stack.pop() {
         match token {
             Unary(_) | Binary(_) => output.push(token),
-            LParen => return Err(RPNError::MismatchedLParen(index)),
+            LParen | Func(_) => return Err(RPNError::MismatchedLParen(index)),
             _ => panic!("Unexpected token on stack."),
         }
     }
@@ -103,6 +109,7 @@ pub fn to_rpn(input: &[Token]) -> Result<Vec<Token>, RPNError> {
             Var(_) | Number(_) => n_operands += 1,
             Unary(_) => (),
             Binary(_) => n_operands -= 1,
+            Func(_) => n_operands -= 1 - 1,
             _ => panic!("Nothing else should be here"),
         }
         if n_operands <= 0 {
@@ -147,10 +154,19 @@ mod tests {
         assert_eq!(to_rpn(&[Var("x".into()), Binary(Plus), Var("y".into())]),
                    Ok(vec![Var("x".into()), Var("y".into()), Binary(Plus)]));
 
+        assert_eq!(to_rpn(&[Func("round".into()),
+                            Func("sin".into()),
+                            Number(1f64),
+                            RParen,
+                            RParen]),
+                   Ok(vec![Number(1f64), Func("sin".into()), Func("round".into())]));
+
         assert_eq!(to_rpn(&[Binary(Plus)]), Err(RPNError::NotEnoughOperands(0)));
         assert_eq!(to_rpn(&[Var("x".into()), Number(1.)]),
                    Err(RPNError::TooManyOperands));
         assert_eq!(to_rpn(&[LParen]), Err(RPNError::MismatchedLParen(0)));
         assert_eq!(to_rpn(&[RParen]), Err(RPNError::MismatchedRParen(0)));
+        assert_eq!(to_rpn(&[Func("sin".into())]),
+                   Err(RPNError::MismatchedLParen(0)));
     }
 }
