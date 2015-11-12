@@ -36,8 +36,9 @@ fn main() {
 }
 ```
 
-Need to define a Rust function from an expression? No problem, use [`Expr`](struct.Expr.html)
-for this and more:
+Need to define a Rust function from an expression? No problem, use
+[`Expr`](http://rekka.github.io/meval-rs/meval/struct.Expr.html) for
+this and more:
 
 ```rust
 extern crate meval;
