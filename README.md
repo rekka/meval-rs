@@ -1,7 +1,28 @@
 # meval-rs
 
-This [Rust] crate provides a simple math expression parser. Its main goal is to be convenient
-to use, while allowing for some flexibility.
+[![Build Status](https://travis-ci.org/rekka/meval-rs.svg?branch=master)](https://travis-ci.org/rekka/meval-rs)
+
+This [Rust] crate provides a simple math expression parsing and evaluation. Its main goal is to
+be convenient to use, while allowing for some flexibility.
+
+## Documentation
+
+[Full API documentation](http://rekka.github.io/meval-rs/meval/index.html)
+
+## Installation
+
+Simply add the corresponding entry to your `Cargo.toml` dependency list:
+
+```toml
+[dependencies]
+meval = { git = "https://github.com/rekka/meval-rs" }
+```
+
+and add this to your crate root:
+
+```rust
+extern crate meval;
+```
 
 ## Simple examples
 

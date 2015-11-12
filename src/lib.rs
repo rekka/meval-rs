@@ -1,5 +1,5 @@
-//! This [Rust] crate provides a simple math expression parser. Its main goal is to be convenient
-//! to use, while allowing for some flexibility.
+//! This [Rust] crate provides a simple math expression parsing and evaluation. Its main goal is to
+//! be convenient to use, while allowing for some flexibility.
 //!
 //! ## Simple examples
 //!
