@@ -53,12 +53,25 @@ fn main() {
 }
 ```
 
+[`Expr::bind`](http://rekka.github.io/meval-rs/meval/struct.Expr.html#method.bind)
+returns a boxed closure that is slightly less convenient than an unboxed
+closure since `Box<Fn(f64) -> f64>` does not implement `FnOnce`, `Fn` or
+`FnMut`. So to use it directly as a function argument where a closure is
+expected, it has to be manually dereferenced:
+
+```rust
+let func = meval::Expr::from_str("x").unwrap().bind("x").unwrap();
+let r = Some(2.).map(&*func);
+```
+
 ## Supported expressions
 
 `meval` supports basic mathematical operations on floating point numbers:
 
 - binary operators: `+`, `-`, `*`, `/`, `^` (power)
 - unary operators: `+`, `-`
+
+It supports custom variables like `x`, `weight`, etc.
 
 Build-in functions currently supported (implemented using functions of the same name in [Rust
 std library][std-float]):

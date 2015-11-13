@@ -10,8 +10,16 @@ use shunting_yard::to_rpn;
 /// The expression is internally stored in [reverse Polish notation (RPN)][RPN] as a sequence of
 /// `Token`s.
 ///
-/// Functions `bind`, `bind_with_context`, `bind2`, ... can be used to create (boxed) closures from
-/// the expression that then can be passed around and used as any other `Fn` closures.
+/// Methods `bind`, `bind_with_context`, `bind2`, ... can be used to create (boxed) closures from
+/// the expression that then can be passed around and used as any other `Fn` closures.  A boxed
+/// closure is unfortunately currently slightly less convenient than an unboxed closure since
+/// `Box<Fn(f64) -> f64>` does not implement `FnOnce`, `Fn` or `FnMut`. So to use it directly as a
+/// function argument where a closure is expected, it has to be manually dereferenced:
+///
+/// ```rust
+/// let func = meval::Expr::from_str("x").unwrap().bind("x").unwrap();
+/// let r = Some(2.).map(&*func);
+/// ```
 ///
 /// [RPN]: https://en.wikipedia.org/wiki/Reverse_Polish_notation
 #[derive(Debug, Clone)]
