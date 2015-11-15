@@ -46,7 +46,8 @@
 //! - binary operators: `+`, `-`, `*`, `/`, `^` (power)
 //! - unary operators: `+`, `-`
 //!
-//! It supports custom variables like `x`, `weight`, etc.
+//! It supports custom variables like `x`, `weight`, `C_0`, etc. A variable must start with
+//! `[a-zA-Z_]` and can contain only `[a-zA-Z0-9_]`.
 //!
 //! Build-in functions currently supported (implemented using
 //! functions of the same name in [Rust std library][std-float]):
