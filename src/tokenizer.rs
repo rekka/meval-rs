@@ -293,7 +293,7 @@ mod tests {
 
     #[test]
     fn test_var() {
-        for &s in ["abc", "u0", "_034", "a_be45ea"].iter() {
+        for &s in ["abc", "U0", "_034", "a_be45EA"].iter() {
             assert_eq!(var(s.as_bytes()),
                        IResult::Done(&b""[..], Token::Var(s.into())));
         }
@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     fn test_func() {
-        for &s in ["abc(", "u0(", "_034 (", "a_be45ea  ("].iter() {
+        for &s in ["abc(", "u0(", "_034 (", "A_be45EA  ("].iter() {
             assert_eq!(func(s.as_bytes()),
                        IResult::Done(&b""[..], Token::Func((&s[0..s.len() - 1]).trim().into())));
         }
@@ -356,7 +356,7 @@ mod tests {
                            Number(2f64),
                            RParen]));
 
-        assert_eq!(tokenize("-2^ ab0 *12 - c_0"),
+        assert_eq!(tokenize("-2^ ab0 *12 - C_0"),
                    Ok(vec![Unary(Minus),
                            Number(2f64),
                            Binary(Pow),
@@ -364,10 +364,10 @@ mod tests {
                            Binary(Times),
                            Number(12f64),
                            Binary(Minus),
-                           Var("c_0".into()),
+                           Var("C_0".into()),
                    ]));
 
-        assert_eq!(tokenize("-sin(pi * 3)^ cos(2) / func2(x) * _buildin(y)"),
+        assert_eq!(tokenize("-sin(pi * 3)^ cos(2) / Func2(x) * _buildIN(y)"),
                    Ok(vec![Unary(Minus),
                            Func("sin".into()),
                            Var("pi".into()),
@@ -379,11 +379,11 @@ mod tests {
                            Number(2f64),
                            RParen,
                            Binary(Div),
-                           Func("func2".into()),
+                           Func("Func2".into()),
                            Var("x".into()),
                            RParen,
                            Binary(Times),
-                           Func("_buildin".into()),
+                           Func("_buildIN".into()),
                            Var("y".into()),
                            RParen,
                        ]));
