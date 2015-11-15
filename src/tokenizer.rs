@@ -80,7 +80,35 @@ named!(func<Token>, map!(map_res!(
             )
       );
 
-named!(var<Token>, map!(map_res!(alpha, from_utf8), |s: &str| Token::Var(s.into())));
+/// Parse an identifier:
+///
+/// Must start with a letter or an underscore, can be followed by letters, digits or underscores.
+fn ident(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    use nom::IResult::*;
+    use nom::{Needed, ErrorKind};
+    use nom::Err::*;
+
+    // first character must be 'a'...'z' | 'A'...'Z' | '_'
+    match input.first().map(|&c| c as char) {
+        Some('a'...'z') | Some('A'...'Z') | Some('_') => {
+            let n = input.iter()
+                         .skip(1)
+                         .take_while(|&&c| {
+                             match c as char {
+                                 'a'...'z' | 'A'...'Z' | '_' | '0'...'9' => true,
+                                 _ => false,
+                             }
+                         })
+                         .count();
+            let (parsed, rest) = input.split_at(n + 1);
+            Done(rest, parsed)
+        }
+        None => Incomplete(Needed::Size(1)),
+        _ => Error(Position(ErrorKind::Custom(0), input)),
+    }
+}
+
+named!(var<Token>, map!(map_res!(ident, from_utf8), |s: &str| Token::Var(s.into())));
 
 /// Matches one or more digit characters `0`...`9`.
 ///
@@ -246,6 +274,8 @@ mod tests {
     use super::*;
     use super::{number, binop, var, func};
     use nom::{IResult, Needed};
+    use nom::ErrorKind::*;
+        use nom::Err::*;
 
     #[test]
     fn it_works() {
@@ -262,10 +292,19 @@ mod tests {
     }
 
     #[test]
+    fn test_var() {
+        for &s in ["abc", "u0", "_034", "a_be45ea"].iter() {
+            assert_eq!(var(s.as_bytes()),
+                       IResult::Done(&b""[..], Token::Var(s.into())));
+        }
+
+        assert_eq!(var(b""), IResult::Incomplete(Needed::Size(1)));
+        assert_eq!(var(b"0"), IResult::Error(Position(Custom(0), &b"0"[..])));
+    }
+
+    #[test]
     fn test_number() {
         use nom::IResult::*;
-        use nom::ErrorKind::*;
-        use nom::Err::*;
 
         assert_eq!(number(b"32143"),
                    IResult::Done(&b""[..], Token::Number(32143f64)));
@@ -305,13 +344,14 @@ mod tests {
                            Number(2f64),
                            RParen]));
 
-        assert_eq!(tokenize("-2^ abc *12"),
+        assert_eq!(tokenize("-2^ ab0 *12 - c_0"),
                    Ok(vec![Unary(Minus),
                            Number(2f64),
                            Binary(Pow),
-                           Var("abc".into()),
+                           Var("ab0".into()),
                            Binary(Times),
-                           Number(12f64)]));
+                           Number(12f64),
+                   Binary(Minus), Var("c_0".into())]));
 
         assert_eq!(tokenize("-sin(pi * 3)^ cos(2)"),
                    Ok(vec![Unary(Minus),
