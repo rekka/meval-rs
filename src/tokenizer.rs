@@ -6,7 +6,7 @@
 //!
 //! [nom]: https://crates.io/crates/nom
 use std::str::from_utf8;
-use nom::{IResult, Needed, alpha, multispace, slice_to_offsets};
+use nom::{IResult, Needed, multispace, slice_to_offsets};
 
 /// An error reported by the parser.
 #[derive(Debug, Clone, PartialEq)]
@@ -72,14 +72,6 @@ named!(unop<Token>, alt!(
 named!(lparen<Token>, chain!(tag!("("),||{Token::LParen}));
 named!(rparen<Token>, chain!(tag!(")"),||{Token::RParen}));
 
-/// Parse `func(`, returns `func`.
-named!(func<Token>, map!(map_res!(
-            terminated!(alpha,
-                        preceded!(opt!(multispace), tag!("("))), from_utf8),
-            |s: &str| Token::Func(s.into())
-            )
-      );
-
 /// Parse an identifier:
 ///
 /// Must start with a letter or an underscore, can be followed by letters, digits or underscores.
@@ -109,6 +101,14 @@ fn ident(input: &[u8]) -> IResult<&[u8], &[u8]> {
 }
 
 named!(var<Token>, map!(map_res!(ident, from_utf8), |s: &str| Token::Var(s.into())));
+
+/// Parse `func(`, returns `func`.
+named!(func<Token>, map!(map_res!(
+            terminated!(ident,
+                        preceded!(opt!(multispace), tag!("("))), from_utf8),
+            |s: &str| Token::Func(s.into())
+            )
+      );
 
 /// Matches one or more digit characters `0`...`9`.
 ///
@@ -275,7 +275,7 @@ mod tests {
     use super::{number, binop, var, func};
     use nom::{IResult, Needed};
     use nom::ErrorKind::*;
-        use nom::Err::*;
+    use nom::Err::*;
 
     #[test]
     fn it_works() {
@@ -300,6 +300,18 @@ mod tests {
 
         assert_eq!(var(b""), IResult::Incomplete(Needed::Size(1)));
         assert_eq!(var(b"0"), IResult::Error(Position(Custom(0), &b"0"[..])));
+    }
+
+    #[test]
+    fn test_func() {
+        for &s in ["abc(", "u0(", "_034 (", "a_be45ea  ("].iter() {
+            assert_eq!(func(s.as_bytes()),
+                       IResult::Done(&b""[..], Token::Func((&s[0..s.len() - 1]).trim().into())));
+        }
+
+        assert_eq!(func(b""), IResult::Incomplete(Needed::Size(1)));
+        assert_eq!(func(b"("), IResult::Error(Position(Custom(0), &b"("[..])));
+        assert_eq!(func(b"0("), IResult::Error(Position(Custom(0), &b"0("[..])));
     }
 
     #[test]
@@ -351,9 +363,11 @@ mod tests {
                            Var("ab0".into()),
                            Binary(Times),
                            Number(12f64),
-                   Binary(Minus), Var("c_0".into())]));
+                           Binary(Minus),
+                           Var("c_0".into()),
+                   ]));
 
-        assert_eq!(tokenize("-sin(pi * 3)^ cos(2)"),
+        assert_eq!(tokenize("-sin(pi * 3)^ cos(2) / func2(x) * _buildin(y)"),
                    Ok(vec![Unary(Minus),
                            Func("sin".into()),
                            Var("pi".into()),
@@ -364,7 +378,15 @@ mod tests {
                            Func("cos".into()),
                            Number(2f64),
                            RParen,
-                           ]));
+                           Binary(Div),
+                           Func("func2".into()),
+                           Var("x".into()),
+                           RParen,
+                           Binary(Times),
+                           Func("_buildin".into()),
+                           Var("y".into()),
+                           RParen,
+                       ]));
 
         assert_eq!(tokenize(""), Err(ParseError::MissingArgument));
         assert_eq!(tokenize("2)"), Err(ParseError::UnexpectedToken(1)));
