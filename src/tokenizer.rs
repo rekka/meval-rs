@@ -134,7 +134,7 @@ fn digit_fixed(input: &[u8]) -> IResult<&[u8], &[u8]> {
 
 named!(float<usize>, chain!(
         a: digit_fixed ~
-        b: opt!(chain!(tag!(".") ~ d: opt!(digit_fixed),||{1 + d.map(|s| s.len()).unwrap_or(0)})) ~
+        b: complete!(chain!(tag!(".") ~ d: complete!(digit_fixed)?,||{1 + d.map(|s| s.len()).unwrap_or(0)}))? ~
         e: exp,
         ||{a.len() + b.unwrap_or(0) + e.unwrap_or(0)}
     )

@@ -1,19 +1,16 @@
 [package]
 authors = ["Norbert Pozar <bertapozar@gmail.com>"]
-name = "meval"
 description = "A simple math expression parser and evaluator."
-version = "0.0.1"
-license = "MIT"
-keywords = ["math", "parser", "expression", "formula", "evaluator"]
 documentation = "http://rekka.github.io/meval-rs/meval/index.html"
 homepage = "https://github.com/rekka/meval-rs"
+keywords = ["math", "parser", "expression", "formula", "evaluator"]
+license = "MIT"
+name = "meval"
 repository = "https://github.com/rekka/meval-rs"
+version = "0.0.1"
 
 [dependencies]
-
-[dependencies.nom]
-git = "https://github.com/Geal/nom.git"
-rev = "caccedc86cbf6947a899b97d224240ad35f4eeb2"
+nom = "1.0.0"
 
 [dev-dependencies]
 gnuplot = "0.0.18"
