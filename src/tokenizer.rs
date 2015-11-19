@@ -45,13 +45,15 @@ pub enum Token {
     LParen,
     /// Right parenthesis.
     RParen,
+    /// Comma: function argument separator
+    Comma,
 
     /// A number.
     Number(f64),
     /// A variable.
     Var(String),
-    /// A function.
-    Func(String),
+    /// A function with name and number of arguments.
+    Func(String, Option<usize>),
 }
 
 named!(binop<Token>, alt!(
@@ -71,6 +73,7 @@ named!(unop<Token>, alt!(
 
 named!(lparen<Token>, chain!(tag!("("),||{Token::LParen}));
 named!(rparen<Token>, chain!(tag!(")"),||{Token::RParen}));
+named!(comma<Token>, chain!(tag!(","),||{Token::Comma}));
 
 /// Parse an identifier:
 ///
@@ -106,7 +109,7 @@ named!(var<Token>, map!(map_res!(complete!(ident), from_utf8), |s: &str| Token::
 named!(func<Token>, map!(map_res!(
             terminated!(complete!(ident),
                         preceded!(opt!(multispace), complete!(tag!("(")))), from_utf8),
-            |s: &str| Token::Func(s.into())
+            |s: &str| Token::Func(s.into(), None)
             )
       );
 
@@ -187,13 +190,22 @@ named!(after_rexpr<Token>, delimited!(opt!(multispace),
 named!(after_rexpr_no_paren<Token>, delimited!(opt!(multispace),
                                                alt!(binop),
                                                opt!(multispace)));
+named!(after_rexpr_comma<Token>, delimited!(opt!(multispace),
+                                      alt!(binop | rparen | comma),
+                                      opt!(multispace)));
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 enum TokenizerState {
     // accept any token that is an expression from the left: var, num, (, unop
     LExpr,
-    // accept any token that needs an expression on the left: binop, )
+    // accept any token that needs an expression on the left: binop, ), comma
     AfterRExpr,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ParenState {
+    Subexpr,
+    Func,
 }
 
 /// Tokenize a given mathematical expression.
@@ -217,34 +229,35 @@ pub fn tokenize<S: AsRef<str>>(input: S) -> Result<Vec<Token>, ParseError> {
     let mut s = input;
 
     while !s.is_empty() {
-        let r = match state {
-            LExpr => lexpr(s),
-            AfterRExpr if paren_stack.is_empty() => after_rexpr_no_paren(s),
-            AfterRExpr => after_rexpr(s),
+        let r = match (state, paren_stack.last()) {
+            (LExpr, _) => lexpr(s),
+            (AfterRExpr, None)  => after_rexpr_no_paren(s),
+            (AfterRExpr, Some(&ParenState::Subexpr)) => after_rexpr(s),
+            (AfterRExpr, Some(&ParenState::Func)) => after_rexpr_comma(s),
         };
 
         match r {
-            Done(m, t) => {
+            Done(rest, t) => {
                 match t {
-                    Token::LParen | Token::Func(_) => {
-                        paren_stack.push(0);
+                    Token::LParen => {
+                        paren_stack.push(ParenState::Subexpr);
+                    }
+                    Token::Func(..) => {
+                        paren_stack.push(ParenState::Func);
                     }
                     Token::RParen => {
                         paren_stack.pop().expect("The paren_stack is empty!");
                     }
-                    Token::Var(_) => {
+                    Token::Var(_) | Token::Number(_) => {
                         state = AfterRExpr;
                     }
-                    Token::Number(_) => {
-                        state = AfterRExpr;
-                    }
-                    Token::Binary(_) => {
+                    Token::Binary(_) | Token::Comma => {
                         state = LExpr;
                     }
                     _ => {}
                 }
                 res.push(t);
-                s = m;
+                s = rest;
             }
             Error(Err::Position(_, p)) => {
                 let (i, _) = slice_to_offsets(input, p);
@@ -283,9 +296,9 @@ mod tests {
         assert_eq!(var(b"abc"),
                    IResult::Done(&b""[..], Token::Var("abc".into())));
         assert_eq!(func(b"abc("),
-                   IResult::Done(&b""[..], Token::Func("abc".into())));
+                   IResult::Done(&b""[..], Token::Func("abc".into(), None)));
         assert_eq!(func(b"abc ("),
-                   IResult::Done(&b""[..], Token::Func("abc".into())));
+                   IResult::Done(&b""[..], Token::Func("abc".into(), None)));
     }
 
     #[test]
@@ -303,7 +316,7 @@ mod tests {
     fn test_func() {
         for &s in ["abc(", "u0(", "_034 (", "A_be45EA  ("].iter() {
             assert_eq!(func(s.as_bytes()),
-                       IResult::Done(&b""[..], Token::Func((&s[0..s.len() - 1]).trim().into())));
+                       IResult::Done(&b""[..], Token::Func((&s[0..s.len() - 1]).trim().into(), None)));
         }
 
         assert_eq!(func(b""), IResult::Error(Position(Complete, &b""[..])));
@@ -364,30 +377,40 @@ mod tests {
                            Var("C_0".into()),
                    ]));
 
-        assert_eq!(tokenize("-sin(pi * 3)^ cos(2) / Func2(x) * _buildIN(y)"),
+        assert_eq!(tokenize("-sin(pi * 3)^ cos(2) / Func2(x, f(y), z) * _buildIN(y)"),
                    Ok(vec![Unary(Minus),
-                           Func("sin".into()),
+                           Func("sin".into(), None),
                            Var("pi".into()),
                            Binary(Times),
                            Number(3f64),
                            RParen,
                            Binary(Pow),
-                           Func("cos".into()),
+                           Func("cos".into(), None),
                            Number(2f64),
                            RParen,
                            Binary(Div),
-                           Func("Func2".into()),
+                           Func("Func2".into(), None),
                            Var("x".into()),
+                           Comma,
+                           Func("f".into(), None),
+                           Var("y".into()),
+                           RParen,
+                           Comma,
+                           Var("z".into()),
                            RParen,
                            Binary(Times),
-                           Func("_buildIN".into()),
+                           Func("_buildIN".into(), None),
                            Var("y".into()),
                            RParen,
                        ]));
+
+        assert_eq!(tokenize("()"), Err(ParseError::UnexpectedToken(1)));
 
         assert_eq!(tokenize(""), Err(ParseError::MissingArgument));
         assert_eq!(tokenize("2)"), Err(ParseError::UnexpectedToken(1)));
         assert_eq!(tokenize("2^"), Err(ParseError::MissingArgument));
         assert_eq!(tokenize("(((2)"), Err(ParseError::MissingRParen(2)));
+        assert_eq!(tokenize("f(2,)"), Err(ParseError::UnexpectedToken(4)));
+        assert_eq!(tokenize("f(,2)"), Err(ParseError::UnexpectedToken(2)));
     }
 }

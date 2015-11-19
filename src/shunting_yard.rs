@@ -22,6 +22,8 @@ pub enum RPNError {
     MismatchedLParen(usize),
     /// An extra right parenthesis was found.
     MismatchedRParen(usize),
+    /// Comma that is not separating function arguments.
+    UnexpectedComma(usize),
     /// Too few operands for some operator.
     NotEnoughOperands(usize),
     /// Too many operands reported.
@@ -47,7 +49,7 @@ fn prec_assoc(token: &Token) -> (u32, Associativity) {
                 _ => unimplemented!(),
             }
         }
-        Var(_) | Number(_) | Func(_) | LParen | RParen => (0, NA),
+        Var(_) | Number(_) | Func(..) | LParen | RParen | Comma => (0, NA),
     }
 }
 
@@ -94,9 +96,9 @@ pub fn to_rpn(input: &[Token]) -> Result<Vec<Token>, RPNError> {
                             found = true;
                             break;
                         }
-                        Func(_) => {
+                        Func(name, nargs) => {
                             found = true;
-                            output.push(t);
+                            output.push(Func(name, Some(nargs.unwrap_or(0) + 1)));
                             break;
                         }
                         _ => output.push(t),
@@ -106,26 +108,45 @@ pub fn to_rpn(input: &[Token]) -> Result<Vec<Token>, RPNError> {
                     return Err(RPNError::MismatchedRParen(index));
                 }
             }
-            Func(_) => stack.push((index, token)),
+            Comma => {
+                let mut found = false;
+                while let Some((i, t)) = stack.pop() {
+                    match t {
+                        LParen => {
+                            return Err(RPNError::UnexpectedComma(index));
+                        }
+                        Func(name, nargs) => {
+                            found = true;
+                            stack.push((i, Func(name, Some(nargs.unwrap_or(0) + 1))));
+                            break;
+                        }
+                        _ => output.push(t),
+                    }
+                }
+                if !found {
+                    return Err(RPNError::UnexpectedComma(index));
+                }
+            }
+            Func(..) => stack.push((index, token)),
         }
     }
 
     while let Some((index, token)) = stack.pop() {
         match token {
             Unary(_) | Binary(_) => output.push(token),
-            LParen | Func(_) => return Err(RPNError::MismatchedLParen(index)),
+            LParen | Func(..) => return Err(RPNError::MismatchedLParen(index)),
             _ => panic!("Unexpected token on stack."),
         }
     }
 
     // verify rpn
-    let mut n_operands = 0;
+    let mut n_operands = 0isize;
     for (index, token) in output.iter().enumerate() {
         match *token {
             Var(_) | Number(_) => n_operands += 1,
             Unary(_) => (),
             Binary(_) => n_operands -= 1,
-            Func(_) => n_operands -= 1 - 1,
+            Func(_, Some(n_args)) => n_operands -= n_args as isize - 1,
             _ => panic!("Nothing else should be here"),
         }
         if n_operands <= 0 {
@@ -170,19 +191,27 @@ mod tests {
         assert_eq!(to_rpn(&[Var("x".into()), Binary(Plus), Var("y".into())]),
                    Ok(vec![Var("x".into()), Var("y".into()), Binary(Plus)]));
 
-        assert_eq!(to_rpn(&[Func("round".into()),
-                            Func("sin".into()),
+        assert_eq!(to_rpn(&[Func("max".into(), None),
+                            Func("sin".into(), None),
                             Number(1f64),
                             RParen,
+                            Comma,
+                            Func("cos".into(), None),
+                            Number(2f64),
+                            RParen,
                             RParen]),
-                   Ok(vec![Number(1f64), Func("sin".into()), Func("round".into())]));
+                   Ok(vec![Number(1f64), Func("sin".into(), Some(1)), Number(2f64), Func("cos".into(), Some(1)), Func("max".into(), Some(2))]));
 
         assert_eq!(to_rpn(&[Binary(Plus)]), Err(RPNError::NotEnoughOperands(0)));
+        assert_eq!(to_rpn(&[Func("f".into(), None), Binary(Plus), RParen]), Err(RPNError::NotEnoughOperands(0)));
         assert_eq!(to_rpn(&[Var("x".into()), Number(1.)]),
                    Err(RPNError::TooManyOperands));
         assert_eq!(to_rpn(&[LParen]), Err(RPNError::MismatchedLParen(0)));
         assert_eq!(to_rpn(&[RParen]), Err(RPNError::MismatchedRParen(0)));
-        assert_eq!(to_rpn(&[Func("sin".into())]),
+        assert_eq!(to_rpn(&[Func("sin".into(), None)]),
                    Err(RPNError::MismatchedLParen(0)));
+        assert_eq!(to_rpn(&[Comma]), Err(RPNError::UnexpectedComma(0)));
+        assert_eq!(to_rpn(&[Func("f".into(), None), Comma]), Err(RPNError::MismatchedLParen(0)));
+        assert_eq!(to_rpn(&[Func("f".into(), None), LParen, Comma, RParen]), Err(RPNError::UnexpectedComma(2)));
     }
 }

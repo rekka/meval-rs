@@ -73,7 +73,7 @@ impl Expr {
                         _ => panic!("Unimplement unary operation: {:?}", op),
                     }
                 }
-                Func(ref n) => {
+                Func(ref n, Some(1)) => {
                     let arg = stack.pop().unwrap();
                     let r = match n.as_ref() {
                         "sqrt" => arg.sqrt(),
