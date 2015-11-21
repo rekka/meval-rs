@@ -277,7 +277,66 @@ impl Deref for Expr {
 /// ```
 ///
 pub trait Context {
-    fn get_var(&self, name: &str) -> Option<f64>;
+    fn get_var(&self, name: &str) -> Option<f64> {
+        None
+    }
+    fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
+        Err(FuncEvalError::UnknownFunction)
+    }
+}
+
+enum FuncEvalError {
+    TooFewArguments,
+    TooManyArguments,
+    NumberArgs(usize),
+    UnknownFunction,
+}
+
+struct Builtins;
+
+macro_rules! one_arg {
+    ($args:expr, $func:ident) => {
+        if $args.len() == 1 {
+            Ok($args[0].$func())
+        } else {
+            Err(FuncEvalError::NumberArgs(1))
+        }
+    }
+}
+
+impl Context for Builtins {
+    fn get_var(&self, name: &str) -> Option<f64> {
+        match name {
+            "pi" => Some(consts::PI),
+            "e" => Some(consts::E),
+            _ => None,
+        }
+    }
+    fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
+        match name {
+            "sqrt" => one_arg!(args, sqrt),
+            "exp" => one_arg!(args, exp),
+            "ln" => one_arg!(args, ln),
+            "abs" => one_arg!(args, abs),
+            "sin" => one_arg!(args, sin),
+            "cos" => one_arg!(args, cos),
+            "tan" => one_arg!(args, tan),
+            "asin" => one_arg!(args, asin),
+            "acos" => one_arg!(args, acos),
+            "atan" => one_arg!(args, atan),
+            "sinh" => one_arg!(args, sinh),
+            "cosh" => one_arg!(args, cosh),
+            "tanh" => one_arg!(args, tanh),
+            "asinh" => one_arg!(args, asinh),
+            "acosh" => one_arg!(args, acosh),
+            "atanh" => one_arg!(args, atanh),
+            "floor" => one_arg!(args, floor),
+            "ceil" => one_arg!(args, ceil),
+            "round" => one_arg!(args, round),
+            "signum" => one_arg!(args, signum),
+            _ => Err(FuncEvalError::UnknownFunction),
+        }
+    }
 }
 
 /// Returns the build-in constants in a form that can be used as a `Context`.
