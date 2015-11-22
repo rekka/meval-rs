@@ -99,3 +99,8 @@ command line scripts. For other similar projects see:
 [Rust]: https://www.rust-lang.org/
 [std-float]: http://doc.rust-lang.org/stable/std/primitive.f64.html
 
+## License
+
+This project is dual-licensed under the Unlicense and MIT licenses.
+
+You may use this code under the terms of either license.
