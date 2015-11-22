@@ -100,42 +100,39 @@ fn ident(input: &[u8]) -> IResult<&[u8], &[u8]> {
     }
 }
 
-named!(var<Token>, map!(map_res!(ident, from_utf8), |s: &str| Token::Var(s.into())));
+named!(var<Token>, map!(map_res!(complete!(ident), from_utf8), |s: &str| Token::Var(s.into())));
 
 /// Parse `func(`, returns `func`.
 named!(func<Token>, map!(map_res!(
-            terminated!(ident,
-                        preceded!(opt!(multispace), tag!("("))), from_utf8),
+            terminated!(complete!(ident),
+                        preceded!(opt!(multispace), complete!(tag!("(")))), from_utf8),
             |s: &str| Token::Func(s.into())
             )
       );
 
 /// Matches one or more digit characters `0`...`9`.
 ///
-/// Fix of IMHO broken `nom::digit`.
-fn digit_fixed(input: &[u8]) -> IResult<&[u8], &[u8]> {
+/// Never returns `nom::IResult::Incomplete`.
+///
+/// Fix of IMHO broken `nom::digit`, which parses an empty string successfully.
+fn digit_complete(input: &[u8]) -> IResult<&[u8], &[u8]> {
     use nom::IResult::*;
-    use nom::{Needed, is_digit, ErrorKind};
+    use nom::{is_digit, ErrorKind};
     use nom::Err::*;
-    if input.is_empty() {
-        return Incomplete(Needed::Size(1));
+
+    let n = input.iter().take_while(|&&c| {is_digit(c)}).count();
+    if n > 0 {
+        let (parsed, rest) = input.split_at(n);
+        Done(rest, parsed)
+    } else {
+        Error(Position(ErrorKind::Digit, input))
     }
-    for (idx, item) in input.iter().enumerate() {
-        if !is_digit(*item) {
-            if idx == 0 {
-                return Error(Position(ErrorKind::Digit, input));
-            } else {
-                return Done(&input[idx..], &input[0..idx]);
-            }
-        }
-    }
-    Done(b"", input)
 }
 
 named!(float<usize>, chain!(
-        a: digit_fixed ~
-        b: complete!(chain!(tag!(".") ~ d: complete!(digit_fixed)?,||{1 + d.map(|s| s.len()).unwrap_or(0)}))? ~
-        e: exp,
+        a: digit_complete ~
+        b: complete!(chain!(tag!(".") ~ d: digit_complete?,||{1 + d.map(|s| s.len()).unwrap_or(0)}))? ~
+        e: complete!(exp),
         ||{a.len() + b.unwrap_or(0) + e.unwrap_or(0)}
     )
 );
@@ -149,7 +146,7 @@ fn exp(input: &[u8]) -> IResult<&[u8], Option<usize>> {
         Error(_) => Done(input, None),
         Done(i, _) => {
             match chain!(i, s: alt!(tag!("+") | tag!("-"))? ~
-                   e: digit_fixed,
+                   e: digit_complete,
                 ||{Some(1 + s.map(|s| s.len()).unwrap_or(0) + e.len())}) {
                 Incomplete(Needed::Size(i)) => {
                     Incomplete(Needed::Size(i + 1))
@@ -182,7 +179,7 @@ fn number(input: &[u8]) -> IResult<&[u8], Token> {
 }
 
 named!(lexpr<Token>, delimited!(opt!(multispace),
-                                alt!(number | complete!(func) | var | unop | lparen),
+                                alt!(number | func | var | unop | lparen),
                                 opt!(multispace)));
 named!(after_rexpr<Token>, delimited!(opt!(multispace),
                                       alt!(binop | rparen),
@@ -298,7 +295,7 @@ mod tests {
                        IResult::Done(&b""[..], Token::Var(s.into())));
         }
 
-        assert_eq!(var(b""), IResult::Incomplete(Needed::Size(1)));
+        assert_eq!(var(b""), IResult::Error(Position(Complete, &b""[..])));
         assert_eq!(var(b"0"), IResult::Error(Position(Custom(0), &b"0"[..])));
     }
 
@@ -309,7 +306,7 @@ mod tests {
                        IResult::Done(&b""[..], Token::Func((&s[0..s.len() - 1]).trim().into())));
         }
 
-        assert_eq!(func(b""), IResult::Incomplete(Needed::Size(1)));
+        assert_eq!(func(b""), IResult::Error(Position(Complete, &b""[..])));
         assert_eq!(func(b"("), IResult::Error(Position(Custom(0), &b"("[..])));
         assert_eq!(func(b"0("), IResult::Error(Position(Custom(0), &b"0("[..])));
     }
@@ -331,12 +328,12 @@ mod tests {
         assert_eq!(number(b"123423e+50"),
                    IResult::Done(&b""[..], Token::Number(123423e+50f64)));
 
-        assert_eq!(number(b""), IResult::Incomplete(Needed::Size(1)));
+        assert_eq!(number(b""), IResult::Error(Position(Digit, &b""[..])));
         assert_eq!(number(b".2"), IResult::Error(Position(Digit, &b".2"[..])));
         assert_eq!(number(b"+"), IResult::Error(Position(Digit, &b"+"[..])));
         assert_eq!(number(b"e"), IResult::Error(Position(Digit, &b"e"[..])));
-        assert_eq!(number(b"1E"), IResult::Incomplete(Needed::Size(3)));
-        assert_eq!(number(b"1e+"), IResult::Incomplete(Needed::Size(4)));
+        assert_eq!(number(b"1E"), IResult::Error(Position(Complete, &b"E"[..])));
+        assert_eq!(number(b"1e+"), IResult::Error(Position(Digit, &b""[..])));
     }
 
     #[test]
