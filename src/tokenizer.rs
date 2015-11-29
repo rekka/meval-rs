@@ -81,13 +81,13 @@ fn ident(input: &[u8]) -> IResult<&[u8], &[u8]> {
     use nom::Err::*;
 
     // first character must be 'a'...'z' | 'A'...'Z' | '_'
-    match input.first().map(|&c| c as char) {
-        Some('a'...'z') | Some('A'...'Z') | Some('_') => {
+    match input.first().cloned() {
+        Some(b'a'...b'z') | Some(b'A'...b'Z') | Some(b'_') => {
             let n = input.iter()
                          .skip(1)
                          .take_while(|&&c| {
-                             match c as char {
-                                 'a'...'z' | 'A'...'Z' | '_' | '0'...'9' => true,
+                             match c {
+                                 b'a'...b'z' | b'A'...b'Z' | b'_' | b'0'...b'9' => true,
                                  _ => false,
                              }
                          })
@@ -290,7 +290,7 @@ mod tests {
 
     #[test]
     fn test_var() {
-        for &s in ["abc", "U0", "_034", "a_be45EA"].iter() {
+        for &s in ["abc", "U0", "_034", "a_be45EA", "aAzZ_"].iter() {
             assert_eq!(var(s.as_bytes()),
                        IResult::Done(&b""[..], Token::Var(s.into())));
         }
