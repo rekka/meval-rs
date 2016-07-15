@@ -8,6 +8,7 @@ license = "Unlicense/MIT"
 name = "meval"
 repository = "https://github.com/rekka/meval-rs"
 version = "0.0.2"
+readme = "README.md"
 
 [dependencies]
 nom = "1.0.0"
