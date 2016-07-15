@@ -79,6 +79,21 @@ assert_eq!(func(2.), -2. * -1. + 2. + 1.);
 For functions with 2, 3, and N variables use `CustomFunc2`, `CustomFunc3` and `CustomFuncN`
 respectively.
 
+If you need a custom function depending on mutable parameters, you will need to use a
+[`Cell`](https://doc.rust-lang.org/stable/std/cell/struct.Cell.html):
+
+```rust
+use std::cell::Cell;
+let y = Cell::new(0.);
+let expr = meval::Expr::from_str("phi(x)").unwrap();
+
+let ctx = meval::CustomFunc("phi", |x| x + y.get());
+let func = expr.bind_with_context(ctx, "x").unwrap();
+assert_eq!(func(2.), 2.);
+y.set(3.);
+assert_eq!(func(2.), 5.);
+```
+
 ## Supported expressions
 
 `meval` supports basic mathematical operations on floating point numbers:

@@ -442,7 +442,7 @@ pub struct CustomFunc2<S, T>(pub S, pub T);
 pub struct CustomFunc3<S, T>(pub S, pub T);
 
 /// A custom function of N variables.
-pub struct CustomFuncN<S, T>(pub S, pub T, usize);
+pub struct CustomFuncN<S, T>(pub S, pub T, pub usize);
 
 impl<S: AsRef<str>, T: Fn(f64) -> f64> Context for CustomFunc<S, T> {
     fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
