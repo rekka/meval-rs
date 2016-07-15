@@ -49,15 +49,20 @@
 //! It supports custom variables like `x`, `weight`, `C_0`, etc. A variable must start with
 //! `[a-zA-Z_]` and can contain only `[a-zA-Z0-9_]`.
 //!
-//! Build-in functions currently supported (implemented using
-//! functions of the same name in [Rust std library][std-float]):
+//! Build-in functions currently supported:
 //!
-//! - `sqrt`, `abs`
-//! - `exp`, `ln`
-//! - `sin`, `cos`, `tan`, `asin`, `acos`, `atan`
-//! - `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`
-//! - `floor`, `ceil`, `round`
-//! - `signum`
+//! - implemented using functions of the same name in [Rust std library][std-float]:
+//!
+//!     - `sqrt`, `abs`
+//!     - `exp`, `ln`
+//!     - `sin`, `cos`, `tan`, `asin`, `acos`, `atan`
+//!     - `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`
+//!     - `floor`, `ceil`, `round`
+//!     - `signum`
+//!
+//! - other
+//!
+//!     - `max(x, ...)`, `min(x, ...)`: maximum and minimumum of 1 or more numbers
 //!
 //! Build-in constants:
 //!
@@ -91,7 +96,7 @@ pub use tokenizer::ParseError;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     UnknownVariable(String),
-    UnknownFunction(String),
+    Function(String, FuncEvalError),
     /// An error returned by the parser.
     ParseError(ParseError),
     /// The shunting-yard algorithm returned an error.
@@ -103,8 +108,8 @@ impl fmt::Display for Error {
         match *self {
             Error::UnknownVariable(ref name) =>
                 write!(f, "Evaluation error: unknown variable `{}`", name),
-            Error::UnknownFunction(ref name) =>
-                write!(f, "Evaluation error: unknown function `{}`", name),
+            Error::Function(ref name, ref e) =>
+                write!(f, "Evaluation error: function `{}`: {}", name, e),
             Error::ParseError(ref e) => write!(f, "Parse error: {:?}", e),
             Error::RPNError(ref e) => write!(f, "RPN error: {:?}", e),
         }

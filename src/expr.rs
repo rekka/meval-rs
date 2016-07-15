@@ -4,6 +4,7 @@ use std::f64::consts;
 use Error;
 use tokenizer::{Token, tokenize};
 use shunting_yard::to_rpn;
+use std::fmt;
 
 /// Representation of a parsed expression.
 ///
@@ -73,32 +74,17 @@ impl Expr {
                         _ => panic!("Unimplement unary operation: {:?}", op),
                     }
                 }
-                Func(ref n, Some(1)) => {
-                    let arg = stack.pop().unwrap();
-                    let r = match n.as_ref() {
-                        "sqrt" => arg.sqrt(),
-                        "exp" => arg.exp(),
-                        "ln" => arg.ln(),
-                        "abs" => arg.abs(),
-                        "sin" => arg.sin(),
-                        "cos" => arg.cos(),
-                        "tan" => arg.tan(),
-                        "asin" => arg.asin(),
-                        "acos" => arg.acos(),
-                        "atan" => arg.atan(),
-                        "sinh" => arg.sinh(),
-                        "cosh" => arg.cosh(),
-                        "tanh" => arg.tanh(),
-                        "asinh" => arg.asinh(),
-                        "acosh" => arg.acosh(),
-                        "atanh" => arg.atanh(),
-                        "floor" => arg.floor(),
-                        "ceil" => arg.ceil(),
-                        "round" => arg.round(),
-                        "signum" => arg.signum(),
-                        _ => return Err(Error::UnknownFunction(n.clone())),
-                    };
-                    stack.push(r);
+                Func(ref n, Some(i)) => {
+                    if stack.len() < i {
+                        panic!("eval: stack does not have enough arguments for function token {:?}", token);
+                    }
+                    match ctx.eval_func(n, &stack[stack.len() - i..]) {
+                        Ok(r) => {
+                            let nl = stack.len() - i;
+                            stack.truncate(nl);
+                        stack.push(r);}
+                        Err(e) => return Err(Error::Function(n.to_owned(), e)),
+                    }
                 }
                 _ => panic!("Unrecognized token: {:?}", token),
             }
@@ -285,14 +271,28 @@ pub trait Context {
     }
 }
 
-enum FuncEvalError {
+#[derive(Debug, Clone, PartialEq)]
+pub enum FuncEvalError {
     TooFewArguments,
     TooManyArguments,
     NumberArgs(usize),
     UnknownFunction,
 }
 
-struct Builtins;
+impl fmt::Display for FuncEvalError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            FuncEvalError::UnknownFunction =>
+                write!(f, "Unknown function"),
+            FuncEvalError::NumberArgs(i) =>
+                write!(f, "Expected {} arguments", i),
+            FuncEvalError::TooFewArguments => write!(f, "Too few arguments"),
+            FuncEvalError::TooManyArguments => write!(f, "Too many arguments"),
+        }
+    }
+}
+
+pub struct Builtins;
 
 macro_rules! one_arg {
     ($args:expr, $func:ident) => {
@@ -302,6 +302,24 @@ macro_rules! one_arg {
             Err(FuncEvalError::NumberArgs(1))
         }
     }
+}
+
+macro_rules! one_or_more_arg {
+    ($args:expr, $func:ident) => {
+        if $args.len() >= 1 {
+            Ok($func($args))
+        } else {
+            Err(FuncEvalError::TooFewArguments)
+        }
+    }
+}
+
+fn max_array(xs: &[f64]) -> f64 {
+    xs.iter().fold(::std::f64::NEG_INFINITY, |m, &x| m.max(x))
+}
+
+fn min_array(xs: &[f64]) -> f64 {
+    xs.iter().fold(::std::f64::INFINITY, |m, &x| m.min(x))
 }
 
 impl Context for Builtins {
@@ -334,25 +352,39 @@ impl Context for Builtins {
             "ceil" => one_arg!(args, ceil),
             "round" => one_arg!(args, round),
             "signum" => one_arg!(args, signum),
+            "max" => one_or_more_arg!(args, max_array),
+            "min" => one_or_more_arg!(args, min_array),
             _ => Err(FuncEvalError::UnknownFunction),
         }
     }
 }
 
 /// Returns the build-in constants in a form that can be used as a `Context`.
-pub fn builtin() -> [(&'static str, f64); 2] {
-    return [("pi", consts::PI), ("e", consts::E)];
+pub fn builtin() -> Builtins {
+    // return [("pi", consts::PI), ("e", consts::E)];
+    Builtins
 }
 
 impl<'a, T: Context> Context for &'a T {
     fn get_var(&self, name: &str) -> Option<f64> {
         (&**self).get_var(name)
     }
+
+    fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
+        (&**self).eval_func(name, args)
+    }
 }
 
 impl<T: Context, S: Context> Context for (T, S) {
     fn get_var(&self, name: &str) -> Option<f64> {
         self.0.get_var(name).or_else(|| self.1.get_var(name))
+    }
+    fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
+        match self.0.eval_func(name, args) {
+            Err(FuncEvalError::UnknownFunction) =>
+                self.1.eval_func(name, args),
+            e => e
+        }
     }
 }
 
@@ -431,6 +463,10 @@ mod tests {
         //            Ok(256.));
         assert_eq!(eval_str("round(sin (pi) * cos(0))"), Ok(0.));
         assert_eq!(eval_str("round( sqrt(3^2 + 4^2)) "), Ok(5.));
+        assert_eq!(eval_str("max(1.)"), Ok(1.));
+        assert_eq!(eval_str("max(1., 2., -1)"), Ok(2.));
+        assert_eq!(eval_str("min(1., 2., -1)"), Ok(-1.));
+        assert_eq!(eval_str("sin(1.) + cos(2.)"), Ok((1f64).sin() + (2f64).cos()));
     }
 
     #[test]
@@ -457,5 +493,9 @@ mod tests {
         let expr = Expr::from_str("x + y^2 + z^3").unwrap();
         let func = expr.clone().bind3("x", "y", "z").unwrap();
         assert_eq!(func(1., 2., 3.), 32.);
+
+        let expr = Expr::from_str("sin(x)").unwrap();
+        let func = expr.clone().bind("x").unwrap();
+        assert_eq!(func(1.), (1f64).sin());
     }
 }
