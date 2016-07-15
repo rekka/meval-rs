@@ -123,7 +123,7 @@ impl Expr {
                                     -> Result<Box<Fn(f64) -> f64 + 'a>, Error>
         where C: Context + 'a
     {
-        try!(self.check_vars(((var, 0.), &ctx)));
+        try!(self.check_context(((var, 0.), &ctx)));
         let var = var.to_owned();
         return Ok(Box::new(move |x| self.eval(((&var, x), &ctx)).expect("Expr::bind")));
     }
@@ -155,7 +155,7 @@ impl Expr {
                                      -> Result<Box<Fn(f64, f64) -> f64 + 'a>, Error>
         where C: Context + 'a
     {
-        try!(self.check_vars(([(var1, 0.), (var2, 0.)], &ctx)));
+        try!(self.check_context(([(var1, 0.), (var2, 0.)], &ctx)));
         let var1 = var1.to_owned();
         let var2 = var2.to_owned();
         return Ok(Box::new(move |x, y| {
@@ -195,7 +195,7 @@ impl Expr {
                                      -> Result<Box<Fn(f64, f64, f64) -> f64 + 'a>, Error>
         where C: Context + 'a
     {
-        try!(self.check_vars(([(var1, 0.), (var2, 0.), (var3, 0.)], &ctx)));
+        try!(self.check_context(([(var1, 0.), (var2, 0.), (var3, 0.)], &ctx)));
         let var1 = var1.to_owned();
         let var2 = var2.to_owned();
         let var3 = var3.to_owned();
@@ -209,12 +209,24 @@ impl Expr {
     /// # Failure
     ///
     /// Returns `Err` if a missing variable is detected.
-    fn check_vars<C: Context>(&self, ctx: C) -> Result<(), Error> {
+    fn check_context<C: Context>(&self, ctx: C) -> Result<(), Error> {
         for t in self.rpn.iter() {
-            if let &Token::Var(ref name) = t {
+            match *t {
+                Token::Var(ref name) => {
                 if ctx.get_var(name).is_none() {
                     return Err(Error::UnknownVariable(name.clone()));
                 }
+                }
+                Token::Func(ref name, Some(i)) => {
+                    let v = vec![0.; i];
+                    if let Err(e) = ctx.eval_func(name, &v) {
+                        return Err(Error::Function(name.to_owned(), e));
+                    }
+                }
+                Token::Func(ref name, None) => {
+                    panic!("expr::check_context: Unexpected token: {:?}", *t);
+                }
+                Token::LParen | Token::RParen | Token::Binary(_) | Token::Unary(_) | Token::Comma | Token::Number(_) => {}
             }
         }
         Ok(())
@@ -497,5 +509,16 @@ mod tests {
         let expr = Expr::from_str("sin(x)").unwrap();
         let func = expr.clone().bind("x").unwrap();
         assert_eq!(func(1.), (1f64).sin());
+
+        let expr = Expr::from_str("sin(x,2)").unwrap();
+        match expr.clone().bind("x") {
+            Err(Error::Function(_, FuncEvalError::NumberArgs(1))) => {},
+            _ => panic!("bind did not error"),
+        }
+        let expr = Expr::from_str("hey(x,2)").unwrap();
+        match expr.clone().bind("x") {
+            Err(Error::Function(_, FuncEvalError::UnknownFunction)) => {},
+            _ => panic!("bind did not error"),
+        }
     }
 }
