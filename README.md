@@ -3,7 +3,8 @@
 [![Build Status](https://travis-ci.org/rekka/meval-rs.svg?branch=master)](https://travis-ci.org/rekka/meval-rs)
 
 This [Rust] crate provides a simple math expression parsing and evaluation. Its main goal is to
-be convenient to use, while allowing for some flexibility.
+be convenient to use, while allowing for some flexibility. Currently works only with `f64`
+types.
 
 ## Documentation
 
@@ -36,9 +37,8 @@ fn main() {
 }
 ```
 
-Need to define a Rust function from an expression? No problem, use
-[`Expr`](http://rekka.github.io/meval-rs/meval/struct.Expr.html) for
-this and more:
+Need to define a Rust function from an expression? No problem, use [`Expr`](http://rekka.github.io/meval-rs/meval/struct.Expr.html)
+for this and more:
 
 ```rust
 extern crate meval;
@@ -53,16 +53,31 @@ fn main() {
 }
 ```
 
-[`Expr::bind`](http://rekka.github.io/meval-rs/meval/struct.Expr.html#method.bind)
-returns a boxed closure that is slightly less convenient than an unboxed
-closure since `Box<Fn(f64) -> f64>` does not implement `FnOnce`, `Fn` or
-`FnMut`. So to use it directly as a function argument where a closure is
-expected, it has to be manually dereferenced:
+[`Expr::bind`](http://rekka.github.io/meval-rs/meval/struct.Expr.html#method.bind) returns a boxed closure that is slightly less
+convenient than an unboxed closure since `Box<Fn(f64) -> f64>` does not implement `FnOnce`,
+`Fn` or `FnMut`. So to use it directly as a function argument where a closure is expected, it
+has to be manually dereferenced:
 
 ```rust
 let func = meval::Expr::from_str("x").unwrap().bind("x").unwrap();
 let r = Some(2.).map(&*func);
 ```
+
+Custom constants and functions? Define a context!
+
+```rust
+let y = 1.;
+let expr = meval::Expr::from_str("phi(-2 * zeta + x)").unwrap();
+
+// create a context with function definitions and variables
+let ctx = (meval::CustomFunc("phi", |x| x + y), ("zeta", -1.));
+// bind function with builtins as well as custom context
+let func = expr.bind_with_context((meval::builtin(), ctx), "x").unwrap();
+assert_eq!(func(2.), -2. * -1. + 2. + 1.);
+```
+
+For functions with 2, 3, and N variables use `CustomFunc2`, `CustomFunc3` and `CustomFuncN`
+respectively.
 
 ## Supported expressions
 
@@ -74,20 +89,25 @@ let r = Some(2.).map(&*func);
 It supports custom variables like `x`, `weight`, `C_0`, etc. A variable must start with
 `[a-zA-Z_]` and can contain only `[a-zA-Z0-9_]`.
 
-Build-in functions currently supported (implemented using functions of the same name in [Rust
-std library][std-float]):
+Build-ins (given by context `meval::builtin()`) currently supported:
 
-- `sqrt`, `abs`
-- `exp`, `ln`
-- `sin`, `cos`, `tan`, `asin`, `acos`, `atan`
-- `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`
-- `floor`, `ceil`, `round`
-- `signum`
+- functions implemented using functions of the same name in [Rust std library][std-float]:
 
-Build-in constants:
+    - `sqrt`, `abs`
+    - `exp`, `ln`
+    - `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`
+    - `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`
+    - `floor`, `ceil`, `round`
+    - `signum`
 
-- `pi`
-- `e`
+- other functions:
+
+    - `max(x, ...)`, `min(x, ...)`: maximum and minimumum of 1 or more numbers
+
+- constants:
+
+    - `pi`
+    - `e`
 
 ## Related projects
 
