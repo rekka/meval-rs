@@ -283,7 +283,7 @@ pub fn tokenize<S: AsRef<str>>(input: S) -> Result<Vec<Token>, ParseError> {
 mod tests {
     use super::*;
     use super::{number, binop, var, func};
-    use nom::{IResult, Needed};
+    use nom::IResult;
     use nom::ErrorKind::*;
     use nom::Err::*;
 
@@ -326,8 +326,6 @@ mod tests {
 
     #[test]
     fn test_number() {
-        use nom::IResult::*;
-
         assert_eq!(number(b"32143"),
                    IResult::Done(&b""[..], Token::Number(32143f64)));
         assert_eq!(number(b"2."),

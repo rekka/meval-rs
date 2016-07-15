@@ -39,6 +39,19 @@
 //! let r = Some(2.).map(&*func);
 //! ```
 //!
+//! Custom constants and functions? Define a context!
+//!
+//! ```rust
+//! let y = 1.;
+//! let ctx = (meval::CustomFunc("phi", |x| x + y), ("zeta", -1.));
+//! let expr = meval::Expr::from_str("phi(-2 * zeta + x)").unwrap();
+//! let func = expr.bind_with_context((meval::builtin(), ctx), "x").unwrap();
+//! assert_eq!(func(2.), -2. * -1. + 2. + 1.);
+//! ```
+//!
+//! For functions with 2, 3, and N variables use `CustomFunc2`, `CustomFunc3` and `CustomFuncN`
+//! respectively.
+//!
 //! ## Supported expressions
 //!
 //! `meval` supports basic mathematical operations on floating point numbers:
@@ -49,9 +62,9 @@
 //! It supports custom variables like `x`, `weight`, `C_0`, etc. A variable must start with
 //! `[a-zA-Z_]` and can contain only `[a-zA-Z0-9_]`.
 //!
-//! Build-in functions currently supported:
+//! Build-ins (given by context `meval::builtin()`) currently supported:
 //!
-//! - implemented using functions of the same name in [Rust std library][std-float]:
+//! - functions implemented using functions of the same name in [Rust std library][std-float]:
 //!
 //!     - `sqrt`, `abs`
 //!     - `exp`, `ln`
@@ -60,14 +73,14 @@
 //!     - `floor`, `ceil`, `round`
 //!     - `signum`
 //!
-//! - other
+//! - other functions:
 //!
 //!     - `max(x, ...)`, `min(x, ...)`: maximum and minimumum of 1 or more numbers
 //!
-//! Build-in constants:
+//! - constants:
 //!
-//! - `pi`
-//! - `e`
+//!     - `pi`
+//!     - `e`
 //!
 //! ## Related projects
 //!

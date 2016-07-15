@@ -223,7 +223,7 @@ impl Expr {
                         return Err(Error::Function(name.to_owned(), e));
                     }
                 }
-                Token::Func(ref name, None) => {
+                Token::Func(_, None) => {
                     panic!("expr::check_context: Unexpected token: {:?}", *t);
                 }
                 Token::LParen | Token::RParen | Token::Binary(_) | Token::Unary(_) | Token::Comma | Token::Number(_) => {}
@@ -275,10 +275,10 @@ impl Deref for Expr {
 /// ```
 ///
 pub trait Context {
-    fn get_var(&self, name: &str) -> Option<f64> {
+    fn get_var(&self, _: &str) -> Option<f64> {
         None
     }
-    fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
+    fn eval_func(&self, _: &str, _: &[f64]) -> Result<f64, FuncEvalError> {
         Err(FuncEvalError::UnknownFunction)
     }
 }
@@ -410,6 +410,60 @@ impl<S: AsRef<str>> Context for (S, f64) {
     }
 }
 
+pub struct CustomFunc<S, T>(pub S, pub T);
+pub struct CustomFunc2<S, T>(pub S, pub T);
+pub struct CustomFunc3<S, T>(pub S, pub T);
+pub struct CustomFuncN<S, T>(pub S, pub T, usize);
+
+impl<S: AsRef<str>, T: Fn(f64) -> f64> Context for CustomFunc<S, T> {
+    fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
+        if name != self.0.as_ref() {
+            return Err(FuncEvalError::UnknownFunction);
+        }
+        if args.len() != 1 {
+            return Err(FuncEvalError::NumberArgs(1));
+        }
+        Ok((self.1)(args[0]))
+    }
+}
+
+impl<S: AsRef<str>, T: Fn(f64, f64) -> f64> Context for CustomFunc2<S, T> {
+    fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
+        if name != self.0.as_ref() {
+            return Err(FuncEvalError::UnknownFunction);
+        }
+        if args.len() != 2 {
+            return Err(FuncEvalError::NumberArgs(2));
+        }
+        Ok((self.1)(args[0], args[1]))
+    }
+}
+
+impl<S: AsRef<str>, T: Fn(f64, f64, f64) -> f64> Context for CustomFunc3<S, T> {
+    fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
+        if name != self.0.as_ref() {
+            return Err(FuncEvalError::UnknownFunction);
+        }
+        if args.len() != 3 {
+            return Err(FuncEvalError::NumberArgs(3));
+        }
+        Ok((self.1)(args[0], args[1], args[2]))
+    }
+}
+
+impl<S: AsRef<str>, T: Fn(&[f64]) -> f64> Context for CustomFuncN<S, T> {
+    fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
+        if name != self.0.as_ref() {
+            return Err(FuncEvalError::UnknownFunction);
+        }
+        if args.len() != self.2 {
+            return Err(FuncEvalError::NumberArgs(self.2));
+        }
+        Ok((self.1)(args))
+    }
+}
+
+
 // macro for implementing Context for arrays
 macro_rules! array_impls {
     ($($N:expr)+) => {
@@ -479,6 +533,19 @@ mod tests {
         assert_eq!(eval_str("max(1., 2., -1)"), Ok(2.));
         assert_eq!(eval_str("min(1., 2., -1)"), Ok(-1.));
         assert_eq!(eval_str("sin(1.) + cos(2.)"), Ok((1f64).sin() + (2f64).cos()));
+    }
+
+    #[test]
+    fn test_eval_func_ctx() {
+        let y = 5.;
+        assert_eq!(eval_str_with_context("phi(2.)",
+                                         CustomFunc("phi", |x| x + y + 3.)), Ok(2. + y + 3.));
+        assert_eq!(eval_str_with_context("phi(2., 3.)",
+                                         CustomFunc2("phi", |x, y| x + y + 3.)), Ok(2. + 3. + 3.));
+        assert_eq!(eval_str_with_context("phi(2., 3., 4.)",
+                                         CustomFunc3("phi", |x, y, z| x + y * z)), Ok(2. + 3. * 4.));
+        assert_eq!(eval_str_with_context("phi(2., 3.)",
+                                         CustomFuncN("phi", |xs: &[f64]| xs[0] + xs[1], 2)), Ok(2. + 3.));
     }
 
     #[test]
