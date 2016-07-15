@@ -1,5 +1,6 @@
 //! This [Rust] crate provides a simple math expression parsing and evaluation. Its main goal is to
-//! be convenient to use, while allowing for some flexibility.
+//! be convenient to use, while allowing for some flexibility. Currently works only with `f64`
+//! types.
 //!
 //! ## Simple examples
 //!
@@ -43,8 +44,11 @@
 //!
 //! ```rust
 //! let y = 1.;
-//! let ctx = (meval::CustomFunc("phi", |x| x + y), ("zeta", -1.));
 //! let expr = meval::Expr::from_str("phi(-2 * zeta + x)").unwrap();
+//!
+//! // create a context with function definitions and variables
+//! let ctx = (meval::CustomFunc("phi", |x| x + y), ("zeta", -1.));
+//! // bind function with builtins as well as custom context
 //! let func = expr.bind_with_context((meval::builtin(), ctx), "x").unwrap();
 //! assert_eq!(func(2.), -2. * -1. + 2. + 1.);
 //! ```

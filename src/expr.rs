@@ -97,7 +97,8 @@ impl Expr {
         Ok(r)
     }
 
-    /// Creates a function of one variable based on this expression, with default constants.
+    /// Creates a function of one variable based on this expression, with default constants and
+    /// functions.
     ///
     /// Binds the input of the returned closure to `var`.
     ///
@@ -128,7 +129,8 @@ impl Expr {
         return Ok(Box::new(move |x| self.eval(((&var, x), &ctx)).expect("Expr::bind")));
     }
 
-    /// Creates a function of two variables based on this expression, with default constants.
+    /// Creates a function of two variables based on this expression, with default constants and
+    /// functions.
     ///
     /// Binds the inputs of the returned closure to `var1` and `var2`.
     ///
@@ -163,7 +165,8 @@ impl Expr {
         }));
     }
 
-    /// Creates a function of three variables based on this expression, with default constants.
+    /// Creates a function of three variables based on this expression, with default constants and
+    /// functions.
     ///
     /// Binds the inputs of the returned closure to `var1`, `var2` and `var3`.
     ///
@@ -259,6 +262,8 @@ impl Deref for Expr {
 
 /// Values of variables (and constants) for substitution into an evaluated expression.
 ///
+/// The built in context is given by the `builtin()` function (or the `Builtins` type).
+///
 /// A `Context` can be built from other contexts:
 ///
 /// ```rust
@@ -269,6 +274,8 @@ impl Deref for Expr {
 ///
 /// let myvars = ("x", 2.);
 /// assert_eq!(myvars.get_var("x"), Some(2f64));
+///
+/// // contexts can be combined using tuples
 /// let ctx = (myvars, bins); // first context has preference if there's duplicity
 ///
 /// assert_eq!(meval::eval_str_with_context("x * pi", ctx).unwrap(), 2. * std::f64::consts::PI);
@@ -283,6 +290,7 @@ pub trait Context {
     }
 }
 
+/// Function evaluation error.
 #[derive(Debug, Clone, PartialEq)]
 pub enum FuncEvalError {
     TooFewArguments,
@@ -304,6 +312,9 @@ impl fmt::Display for FuncEvalError {
     }
 }
 
+/// Built-in functions and constants.
+///
+/// See the library documentation for the list of built-ins.
 pub struct Builtins;
 
 macro_rules! one_arg {
@@ -410,9 +421,16 @@ impl<S: AsRef<str>> Context for (S, f64) {
     }
 }
 
+/// A custom function of one variable.
 pub struct CustomFunc<S, T>(pub S, pub T);
+
+/// A custom function of two variables.
 pub struct CustomFunc2<S, T>(pub S, pub T);
+
+/// A custom function of three variables.
 pub struct CustomFunc3<S, T>(pub S, pub T);
+
+/// A custom function of N variables.
 pub struct CustomFuncN<S, T>(pub S, pub T, usize);
 
 impl<S: AsRef<str>, T: Fn(f64) -> f64> Context for CustomFunc<S, T> {
