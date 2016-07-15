@@ -327,6 +327,16 @@ macro_rules! one_arg {
     }
 }
 
+macro_rules! two_args {
+    ($args:expr, $func:ident) => {
+        if $args.len() == 2 {
+            Ok($args[0].$func($args[1]))
+        } else {
+            Err(FuncEvalError::NumberArgs(2))
+        }
+    }
+}
+
 macro_rules! one_or_more_arg {
     ($args:expr, $func:ident) => {
         if $args.len() >= 1 {
@@ -375,6 +385,7 @@ impl Context for Builtins {
             "ceil" => one_arg!(args, ceil),
             "round" => one_arg!(args, round),
             "signum" => one_arg!(args, signum),
+            "atan2" => two_args!(args, atan2),
             "max" => one_or_more_arg!(args, max_array),
             "min" => one_or_more_arg!(args, min_array),
             _ => Err(FuncEvalError::UnknownFunction),
@@ -551,6 +562,11 @@ mod tests {
         assert_eq!(eval_str("max(1., 2., -1)"), Ok(2.));
         assert_eq!(eval_str("min(1., 2., -1)"), Ok(-1.));
         assert_eq!(eval_str("sin(1.) + cos(2.)"), Ok((1f64).sin() + (2f64).cos()));
+    }
+
+    #[test]
+    fn test_builtins() {
+        assert_eq!(eval_str("atan2(1.,2.)"), Ok((1f64).atan2(2.)));
     }
 
     #[test]
