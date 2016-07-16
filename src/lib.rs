@@ -139,11 +139,11 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Error::UnknownVariable(ref name) =>
-                write!(f, "Evaluation error: unknown variable `{}`", name),
+                write!(f, "Evaluation error: unknown variable `{}`.", name),
             Error::Function(ref name, ref e) =>
                 write!(f, "Evaluation error: function `{}`: {}", name, e),
-            Error::ParseError(ref e) => write!(f, "Parse error: {:?}", e),
-            Error::RPNError(ref e) => write!(f, "RPN error: {:?}", e),
+            Error::ParseError(ref e) => { try!(write!(f, "Parse error: ")); e.fmt(f) },
+            Error::RPNError(ref e) => { try!(write!(f, "RPN error: ")); e.fmt(f) },
         }
     }
 }
@@ -157,5 +157,25 @@ impl From<ParseError> for Error {
 impl From<RPNError> for Error {
     fn from(err: RPNError) -> Error {
         Error::RPNError(err)
+    }
+}
+
+impl std::error::Error for Error {
+    fn description(&self) -> &str {
+        match *self {
+            Error::UnknownVariable(_) => "unknown variable",
+            Error::Function(_, _) => "function evaluation error",
+            Error::ParseError(ref e) => e.description(),
+            Error::RPNError(ref e) => e.description(),
+        }
+    }
+
+    fn cause(&self) -> Option<&std::error::Error> {
+        match *self {
+            Error::ParseError(ref e) => Some(e),
+            Error::RPNError(ref e) => Some(e),
+            Error::Function(_, ref e) => Some(e),
+            _ => None,
+        }
     }
 }

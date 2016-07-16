@@ -5,6 +5,7 @@ use Error;
 use tokenizer::{Token, tokenize};
 use shunting_yard::to_rpn;
 use std::fmt;
+use std;
 
 /// Representation of a parsed expression.
 ///
@@ -308,6 +309,17 @@ impl fmt::Display for FuncEvalError {
                 write!(f, "Expected {} arguments", i),
             FuncEvalError::TooFewArguments => write!(f, "Too few arguments"),
             FuncEvalError::TooManyArguments => write!(f, "Too many arguments"),
+        }
+    }
+}
+
+impl std::error::Error for FuncEvalError {
+    fn description(&self) -> &str {
+        match *self {
+            FuncEvalError::UnknownFunction => "unknown function",
+            FuncEvalError::NumberArgs(_) => "wrong number of function arguments",
+            FuncEvalError::TooFewArguments => "too few function arguments",
+            FuncEvalError::TooManyArguments => "too many function arguments",
         }
     }
 }
