@@ -7,6 +7,8 @@
 //! [nom]: https://crates.io/crates/nom
 use std::str::from_utf8;
 use nom::{IResult, Needed, multispace, slice_to_offsets};
+use std::fmt;
+use std;
 
 /// An error reported by the parser.
 #[derive(Debug, Clone, PartialEq)]
@@ -19,7 +21,26 @@ pub enum ParseError {
     MissingRParen(i32),
     /// Missing operator or function argument at the end of the expression.
     MissingArgument,
-    Unexpected,
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ParseError::UnexpectedToken(i) => write!(f, "Unexpected token at byte {}.", i),
+            ParseError::MissingRParen(i) => write!(f, "Missing {} right parenthes{}.", i, if i == 1 { "is" } else { "es" }),
+            ParseError::MissingArgument => write!(f, "Missing argument at the end of expression."),
+        }
+    }
+}
+
+impl std::error::Error for ParseError {
+    fn description(&self) -> &str {
+        match *self {
+            ParseError::UnexpectedToken(_) => "unexpected token",
+            ParseError::MissingRParen(_) => "missing right parenthesis",
+            ParseError::MissingArgument => "missing argument",
+        }
+    }
 }
 
 /// Mathematical operations.

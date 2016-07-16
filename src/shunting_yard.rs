@@ -7,6 +7,8 @@
 //! [RPN]: https://en.wikipedia.org/wiki/Reverse_Polish_notation
 //! [shunting]: https://en.wikipedia.org/wiki/Shunting-yard_algorithm
 use tokenizer::Token;
+use std;
+use std::fmt;
 
 #[derive(Debug, Clone, Copy)]
 enum Associativity {
@@ -28,6 +30,30 @@ pub enum RPNError {
     NotEnoughOperands(usize),
     /// Too many operands reported.
     TooManyOperands,
+}
+
+impl fmt::Display for RPNError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            RPNError::MismatchedLParen(i) => write!(f, "Mismatched left parenthesis at token {}.", i),
+            RPNError::MismatchedRParen(i) => write!(f, "Mismatched right parenthesis at token {}.", i),
+            RPNError::UnexpectedComma(i) => write!(f, "Unexpected comma at token {}", i),
+            RPNError::NotEnoughOperands(i) => write!(f, "Missing operands at token {}", i),
+            RPNError::TooManyOperands => write!(f, "Too many operands left at the end of expression."),
+        }
+    }
+}
+
+impl std::error::Error for RPNError {
+    fn description(&self) -> &str {
+        match *self {
+            RPNError::MismatchedLParen(_) => "mismatched left parenthesis",
+            RPNError::MismatchedRParen(_) => "mismatched right parenthesis",
+            RPNError::UnexpectedComma(_) => "unexpected comma",
+            RPNError::NotEnoughOperands(_) => "missing operands",
+            RPNError::TooManyOperands => "too many operands left at the end of expression",
+        }
+    }
 }
 
 /// Returns the operator precedence and associativity for a given token.
