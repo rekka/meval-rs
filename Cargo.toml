@@ -7,7 +7,7 @@ keywords = ["math", "parser", "expression", "formula", "evaluator"]
 license = "Unlicense/MIT"
 name = "meval"
 repository = "https://github.com/rekka/meval-rs"
-version = "0.0.4"
+version = "0.0.5"
 readme = "README.md"
 
 [dependencies]
