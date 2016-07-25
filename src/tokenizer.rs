@@ -82,6 +82,7 @@ named!(binop<Token>, alt!(
     chain!(tag!("-"),||{Token::Binary(Operation::Minus)}) |
     chain!(tag!("*"),||{Token::Binary(Operation::Times)}) |
     chain!(tag!("/"),||{Token::Binary(Operation::Div)}) |
+    chain!(tag!("%"),||{Token::Binary(Operation::Rem)}) |
     chain!(tag!("^"),||{Token::Binary(Operation::Pow)})
     )
 );
@@ -422,6 +423,9 @@ mod tests {
                            Var("y".into()),
                            RParen,
                        ]));
+
+        assert_eq!(tokenize("2 % 3"),
+                   Ok(vec![Number(2f64), Binary(Rem), Number(3f64)]));
 
         assert_eq!(tokenize("()"), Err(ParseError::UnexpectedToken(1)));
 

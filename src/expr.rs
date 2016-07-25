@@ -574,6 +574,7 @@ mod tests {
         assert_eq!(eval_str("max(1., 2., -1)"), Ok(2.));
         assert_eq!(eval_str("min(1., 2., -1)"), Ok(-1.));
         assert_eq!(eval_str("sin(1.) + cos(2.)"), Ok((1f64).sin() + (2f64).cos()));
+        assert_eq!(eval_str("10 % 9"), Ok(10f64 % 9f64));
     }
 
     #[test]
