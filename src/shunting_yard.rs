@@ -35,11 +35,17 @@ pub enum RPNError {
 impl fmt::Display for RPNError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            RPNError::MismatchedLParen(i) => write!(f, "Mismatched left parenthesis at token {}.", i),
-            RPNError::MismatchedRParen(i) => write!(f, "Mismatched right parenthesis at token {}.", i),
+            RPNError::MismatchedLParen(i) => {
+                write!(f, "Mismatched left parenthesis at token {}.", i)
+            }
+            RPNError::MismatchedRParen(i) => {
+                write!(f, "Mismatched right parenthesis at token {}.", i)
+            }
             RPNError::UnexpectedComma(i) => write!(f, "Unexpected comma at token {}", i),
             RPNError::NotEnoughOperands(i) => write!(f, "Missing operands at token {}", i),
-            RPNError::TooManyOperands => write!(f, "Too many operands left at the end of expression."),
+            RPNError::TooManyOperands => {
+                write!(f, "Too many operands left at the end of expression.")
+            }
         }
     }
 }
