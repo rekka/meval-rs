@@ -27,7 +27,16 @@ impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             ParseError::UnexpectedToken(i) => write!(f, "Unexpected token at byte {}.", i),
-            ParseError::MissingRParen(i) => write!(f, "Missing {} right parenthes{}.", i, if i == 1 { "is" } else { "es" }),
+            ParseError::MissingRParen(i) => {
+                write!(f,
+                       "Missing {} right parenthes{}.",
+                       i,
+                       if i == 1 {
+                           "is"
+                       } else {
+                           "es"
+                       })
+            }
             ParseError::MissingArgument => write!(f, "Missing argument at the end of expression."),
         }
     }
@@ -107,16 +116,18 @@ fn ident(input: &[u8]) -> IResult<&[u8], &[u8]> {
 
     // first character must be 'a'...'z' | 'A'...'Z' | '_'
     match input.first().cloned() {
-        Some(b'a'...b'z') | Some(b'A'...b'Z') | Some(b'_') => {
+        Some(b'a'...b'z') |
+        Some(b'A'...b'Z') |
+        Some(b'_') => {
             let n = input.iter()
-                         .skip(1)
-                         .take_while(|&&c| {
-                             match c {
-                                 b'a'...b'z' | b'A'...b'Z' | b'_' | b'0'...b'9' => true,
-                                 _ => false,
-                             }
-                         })
-                         .count();
+                .skip(1)
+                .take_while(|&&c| {
+                    match c {
+                        b'a'...b'z' | b'A'...b'Z' | b'_' | b'0'...b'9' => true,
+                        _ => false,
+                    }
+                })
+                .count();
             let (parsed, rest) = input.split_at(n + 1);
             Done(rest, parsed)
         }
@@ -145,7 +156,7 @@ fn digit_complete(input: &[u8]) -> IResult<&[u8], &[u8]> {
     use nom::{is_digit, ErrorKind};
     use nom::Err::*;
 
-    let n = input.iter().take_while(|&&c| {is_digit(c)}).count();
+    let n = input.iter().take_while(|&&c| is_digit(c)).count();
     if n > 0 {
         let (parsed, rest) = input.split_at(n);
         Done(rest, parsed)
@@ -173,9 +184,7 @@ fn exp(input: &[u8]) -> IResult<&[u8], Option<usize>> {
             match chain!(i, s: alt!(tag!("+") | tag!("-"))? ~
                    e: digit_complete,
                 ||{Some(1 + s.map(|s| s.len()).unwrap_or(0) + e.len())}) {
-                Incomplete(Needed::Size(i)) => {
-                    Incomplete(Needed::Size(i + 1))
-                }
+                Incomplete(Needed::Size(i)) => Incomplete(Needed::Size(i + 1)),
                 o => o,
             }
         }
@@ -253,7 +262,7 @@ pub fn tokenize<S: AsRef<str>>(input: S) -> Result<Vec<Token>, ParseError> {
     while !s.is_empty() {
         let r = match (state, paren_stack.last()) {
             (LExpr, _) => lexpr(s),
-            (AfterRExpr, None)  => after_rexpr_no_paren(s),
+            (AfterRExpr, None) => after_rexpr_no_paren(s),
             (AfterRExpr, Some(&ParenState::Subexpr)) => after_rexpr(s),
             (AfterRExpr, Some(&ParenState::Func)) => after_rexpr_comma(s),
         };

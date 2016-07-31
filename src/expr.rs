@@ -48,11 +48,13 @@ impl Expr {
 
         for token in &self.rpn {
             match *token {
-                Var(ref n) => if let Some(v) = ctx.get_var(n) {
-                    stack.push(v);
-                } else {
-                    return Err(Error::UnknownVariable(n.clone()));
-                },
+                Var(ref n) => {
+                    if let Some(v) = ctx.get_var(n) {
+                        stack.push(v);
+                    } else {
+                        return Err(Error::UnknownVariable(n.clone()));
+                    }
+                }
                 Number(f) => stack.push(f),
                 Binary(op) => {
                     let right = stack.pop().unwrap();
@@ -83,7 +85,8 @@ impl Expr {
                         Ok(r) => {
                             let nl = stack.len() - i;
                             stack.truncate(nl);
-                        stack.push(r);}
+                            stack.push(r);
+                        }
                         Err(e) => return Err(Error::Function(n.to_owned(), e)),
                     }
                 }
@@ -217,9 +220,9 @@ impl Expr {
         for t in self.rpn.iter() {
             match *t {
                 Token::Var(ref name) => {
-                if ctx.get_var(name).is_none() {
-                    return Err(Error::UnknownVariable(name.clone()));
-                }
+                    if ctx.get_var(name).is_none() {
+                        return Err(Error::UnknownVariable(name.clone()));
+                    }
                 }
                 Token::Func(ref name, Some(i)) => {
                     let v = vec![0.; i];
@@ -230,7 +233,8 @@ impl Expr {
                 Token::Func(_, None) => {
                     panic!("expr::check_context: Unexpected token: {:?}", *t);
                 }
-                Token::LParen | Token::RParen | Token::Binary(_) | Token::Unary(_) | Token::Comma | Token::Number(_) => {}
+                Token::LParen | Token::RParen | Token::Binary(_) | Token::Unary(_) |
+                Token::Comma | Token::Number(_) => {}
             }
         }
         Ok(())
@@ -333,10 +337,8 @@ pub enum FuncEvalError {
 impl fmt::Display for FuncEvalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            FuncEvalError::UnknownFunction =>
-                write!(f, "Unknown function"),
-            FuncEvalError::NumberArgs(i) =>
-                write!(f, "Expected {} arguments", i),
+            FuncEvalError::UnknownFunction => write!(f, "Unknown function"),
+            FuncEvalError::NumberArgs(i) => write!(f, "Expected {} arguments", i),
             FuncEvalError::TooFewArguments => write!(f, "Too few arguments"),
             FuncEvalError::TooManyArguments => write!(f, "Too many arguments"),
         }
@@ -457,9 +459,8 @@ impl<T: Context, S: Context> Context for (T, S) {
     }
     fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
         match self.0.eval_func(name, args) {
-            Err(FuncEvalError::UnknownFunction) =>
-                self.1.eval_func(name, args),
-            e => e
+            Err(FuncEvalError::UnknownFunction) => self.1.eval_func(name, args),
+            e => e,
         }
     }
 }
@@ -476,7 +477,8 @@ impl<S: AsRef<str>> Context for (S, f64) {
 
 /// `std::collections::HashMap` of variables.
 impl<S> Context for std::collections::HashMap<S, f64>
-    where S: std::hash::Hash + std::cmp::Eq + std::borrow::Borrow<str> {
+    where S: std::hash::Hash + std::cmp::Eq + std::borrow::Borrow<str>
+{
     fn get_var(&self, name: &str) -> Option<f64> {
         self.get(name).cloned()
     }
@@ -484,7 +486,8 @@ impl<S> Context for std::collections::HashMap<S, f64>
 
 /// `std::collections::BTreeMap` of variables.
 impl<S> Context for std::collections::BTreeMap<S, f64>
-    where S: std::cmp::Ord + std::borrow::Borrow<str> {
+    where S: std::cmp::Ord + std::borrow::Borrow<str>
+{
     fn get_var(&self, name: &str) -> Option<f64> {
         self.get(name).cloned()
     }
@@ -637,9 +640,11 @@ mod tests {
         assert_eq!(eval_str_with_context("phi(2., 3.)",
                                          CustomFunc2("phi", |x, y| x + y + 3.)), Ok(2. + 3. + 3.));
         assert_eq!(eval_str_with_context("phi(2., 3., 4.)",
-                                         CustomFunc3("phi", |x, y, z| x + y * z)), Ok(2. + 3. * 4.));
+                                         CustomFunc3("phi", |x, y, z| x + y * z)),
+                                                    Ok(2. + 3. * 4.));
         assert_eq!(eval_str_with_context("phi(2., 3.)",
-                                         CustomFuncN("phi", |xs: &[f64]| xs[0] + xs[1], 2)), Ok(2. + 3.));
+                                         CustomFuncN("phi", |xs: &[f64]| xs[0] + xs[1], 2)),
+                                                    Ok(2. + 3.));
         let mut m = HashMap::new();
         m.insert("x", 2.);
         m.insert("y", 3.);
@@ -683,12 +688,12 @@ mod tests {
 
         let expr = Expr::from_str("sin(x,2)").unwrap();
         match expr.clone().bind("x") {
-            Err(Error::Function(_, FuncEvalError::NumberArgs(1))) => {},
+            Err(Error::Function(_, FuncEvalError::NumberArgs(1))) => {}
             _ => panic!("bind did not error"),
         }
         let expr = Expr::from_str("hey(x,2)").unwrap();
         match expr.clone().bind("x") {
-            Err(Error::Function(_, FuncEvalError::UnknownFunction)) => {},
+            Err(Error::Function(_, FuncEvalError::UnknownFunction)) => {}
             _ => panic!("bind did not error"),
         }
     }

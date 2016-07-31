@@ -138,12 +138,20 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::UnknownVariable(ref name) =>
-                write!(f, "Evaluation error: unknown variable `{}`.", name),
-            Error::Function(ref name, ref e) =>
-                write!(f, "Evaluation error: function `{}`: {}", name, e),
-            Error::ParseError(ref e) => { try!(write!(f, "Parse error: ")); e.fmt(f) },
-            Error::RPNError(ref e) => { try!(write!(f, "RPN error: ")); e.fmt(f) },
+            Error::UnknownVariable(ref name) => {
+                write!(f, "Evaluation error: unknown variable `{}`.", name)
+            }
+            Error::Function(ref name, ref e) => {
+                write!(f, "Evaluation error: function `{}`: {}", name, e)
+            }
+            Error::ParseError(ref e) => {
+                try!(write!(f, "Parse error: "));
+                e.fmt(f)
+            }
+            Error::RPNError(ref e) => {
+                try!(write!(f, "RPN error: "));
+                e.fmt(f)
+            }
         }
     }
 }
