@@ -40,7 +40,7 @@
 //! let r = Some(2.).map(&*func);
 //! ```
 //!
-//! Custom constants and functions? Define a context!
+//! Custom constants and functions? Define a [`Context`](trait.Context.html)!
 //!
 //! ```rust
 //! let y = 1.;
@@ -54,7 +54,7 @@
 //! ```
 //!
 //! For functions with 2, 3, and N variables use `CustomFunc2`, `CustomFunc3` and `CustomFuncN`
-//! respectively.
+//! respectively. See [`Context`](trait.Context.html) for more options.
 //!
 //! If you need a custom function depending on mutable parameters, you will need to use a
 //! [`Cell`](https://doc.rust-lang.org/stable/std/cell/struct.Cell.html):
@@ -75,7 +75,7 @@
 //!
 //! `meval` supports basic mathematical operations on floating point numbers:
 //!
-//! - binary operators: `+`, `-`, `*`, `/`, `^` (power)
+//! - binary operators: `+`, `-`, `*`, `/`, `%` (remainder), `^` (power)
 //! - unary operators: `+`, `-`
 //!
 //! It supports custom variables like `x`, `weight`, `C_0`, etc. A variable must start with

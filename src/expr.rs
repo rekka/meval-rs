@@ -246,7 +246,7 @@ pub fn eval_str<S: AsRef<str>>(expr: S) -> Result<f64, Error> {
 
 /// Evaluates a string with the given context.
 ///
-/// No build-ins are defined in this case.
+/// No built-ins are defined in this case.
 pub fn eval_str_with_context<S: AsRef<str>, C: Context>(expr: S, ctx: C) -> Result<f64, Error> {
     let expr = try!(Expr::from_str(expr));
 
@@ -261,11 +261,13 @@ impl Deref for Expr {
     }
 }
 
-/// Values of variables (and constants) for substitution into an evaluated expression.
+/// Values of variables (and constants) and custom functions for substitution into an evaluated
+/// expression.
 ///
-/// The built in context is given by the `builtin()` function (or the `Builtins` type).
+/// The built in context is returned by the `builtin()` function (or the `Builtins` type).
 ///
-/// A `Context` can be built from other contexts:
+/// Values of variables/constants can be specified by tuples `(name, value)`,
+/// `std::collections::HashMap` or `std::collections::BTreeMap`.
 ///
 /// ```rust
 /// use meval::Context;
@@ -276,10 +278,38 @@ impl Deref for Expr {
 /// let myvars = ("x", 2.);
 /// assert_eq!(myvars.get_var("x"), Some(2f64));
 ///
-/// // contexts can be combined using tuples
-/// let ctx = (myvars, bins); // first context has preference if there's duplicity
+/// let mut varmap = std::collections::HashMap::new();
+/// varmap.insert("x", 2.);
+/// varmap.insert("y", 3.);
+/// assert_eq!(varmap.get_var("x"), Some(2f64));
+/// assert_eq!(varmap.get_var("z"), None);
+/// ```
 ///
-/// assert_eq!(meval::eval_str_with_context("x * pi", ctx).unwrap(), 2. * std::f64::consts::PI);
+/// Custom functions can be defined using one of the `CustomFunc`, `CustomFunc2`, `CustomFunc3` and
+/// `CustomFuncN` tuple structs.
+///
+/// ```rust
+/// use meval::{Context, CustomFunc2};
+///
+/// let cust_func = CustomFunc2("phi", |x, y| x / (y * y));
+///
+/// assert_eq!(cust_func.eval_func("phi", &[2., 3.]), Ok(2. / (3. * 3.)));
+/// ```
+///
+/// A `Context` can be built by combining other contexts:
+///
+/// ```rust
+/// use meval::{Context, CustomFunc2};
+///
+/// let bins = meval::builtin(); // built-ins
+/// let myvars = ("x", 2.);
+/// let cust_func = CustomFunc2("phi", |x, y| x / (y * y));
+///
+/// // contexts can be combined using tuples
+/// let ctx = ((myvars, bins), cust_func); // first context has preference if there's duplicity
+///
+/// assert_eq!(meval::eval_str_with_context("x * pi + phi(1., 2.)", ctx).unwrap(), 2. *
+///             std::f64::consts::PI + 1. / (2. * 2.));
 /// ```
 ///
 pub trait Context {
@@ -405,7 +435,7 @@ impl Context for Builtins {
     }
 }
 
-/// Returns the build-in constants in a form that can be used as a `Context`.
+/// Returns the built-in constants and functions in a form that can be used as a `Context`.
 pub fn builtin() -> Builtins {
     // return [("pi", consts::PI), ("e", consts::E)];
     Builtins
@@ -441,6 +471,22 @@ impl<S: AsRef<str>> Context for (S, f64) {
         } else {
             None
         }
+    }
+}
+
+/// `std::collections::HashMap` of variables.
+impl<S> Context for std::collections::HashMap<S, f64>
+    where S: std::hash::Hash + std::cmp::Eq + std::borrow::Borrow<str> {
+    fn get_var(&self, name: &str) -> Option<f64> {
+        self.get(name).cloned()
+    }
+}
+
+/// `std::collections::BTreeMap` of variables.
+impl<S> Context for std::collections::BTreeMap<S, f64>
+    where S: std::cmp::Ord + std::borrow::Borrow<str> {
+    fn get_var(&self, name: &str) -> Option<f64> {
+        self.get(name).cloned()
     }
 }
 
@@ -584,6 +630,7 @@ mod tests {
 
     #[test]
     fn test_eval_func_ctx() {
+        use std::collections::{HashMap, BTreeMap};
         let y = 5.;
         assert_eq!(eval_str_with_context("phi(2.)",
                                          CustomFunc("phi", |x| x + y + 3.)), Ok(2. + y + 3.));
@@ -593,6 +640,16 @@ mod tests {
                                          CustomFunc3("phi", |x, y, z| x + y * z)), Ok(2. + 3. * 4.));
         assert_eq!(eval_str_with_context("phi(2., 3.)",
                                          CustomFuncN("phi", |xs: &[f64]| xs[0] + xs[1], 2)), Ok(2. + 3.));
+        let mut m = HashMap::new();
+        m.insert("x", 2.);
+        m.insert("y", 3.);
+        assert_eq!(eval_str_with_context("x + y", &m), Ok(2. + 3.));
+        assert_eq!(eval_str_with_context("x + z", m), Err(Error::UnknownVariable("z".into())));
+        let mut m = BTreeMap::new();
+        m.insert("x", 2.);
+        m.insert("y", 3.);
+        assert_eq!(eval_str_with_context("x + y", &m), Ok(2. + 3.));
+        assert_eq!(eval_str_with_context("x + z", m), Err(Error::UnknownVariable("z".into())));
     }
 
     #[test]
