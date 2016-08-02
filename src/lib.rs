@@ -14,7 +14,7 @@
 //! }
 //! ```
 //!
-//! Need to define a Rust function from an expression? No problem, use [`Expr`](struct.Expr.html)
+//! Need to define a Rust function from an expression? No problem, use [`Expr`][Expr]
 //! for this and more:
 //!
 //! ```rust
@@ -30,7 +30,7 @@
 //! }
 //! ```
 //!
-//! [`Expr::bind`](struct.Expr.html#method.bind) returns a boxed closure that is slightly less
+//! [`Expr::bind`][Expr::bind] returns a boxed closure that is slightly less
 //! convenient than an unboxed closure since `Box<Fn(f64) -> f64>` does not implement `FnOnce`,
 //! `Fn` or `FnMut`. So to use it directly as a function argument where a closure is expected, it
 //! has to be manually dereferenced:
@@ -40,7 +40,7 @@
 //! let r = Some(2.).map(&*func);
 //! ```
 //!
-//! Custom constants and functions? Define a [`Context`](trait.Context.html)!
+//! Custom constants and functions? Define a [`Context`][Context]!
 //!
 //! ```rust
 //! let y = 1.;
@@ -54,7 +54,7 @@
 //! ```
 //!
 //! For functions with 2, 3, and N variables use `CustomFunc2`, `CustomFunc3` and `CustomFuncN`
-//! respectively. See [`Context`](trait.Context.html) for more options.
+//! respectively. See [`Context`][Context] for more options.
 //!
 //! If you need a custom function depending on mutable parameters, you will need to use a
 //! [`Cell`](https://doc.rust-lang.org/stable/std/cell/struct.Cell.html):
@@ -110,6 +110,10 @@
 //!
 //! [Rust]: https://www.rust-lang.org/
 //! [std-float]: http://doc.rust-lang.org/stable/std/primitive.f64.html
+//!
+//! [Expr]: struct.Expr.html
+//! [Expr::bind]: struct.Expr.html#method.bind
+//! [Context]: trait.Context.html
 
 #[macro_use]
 extern crate nom;

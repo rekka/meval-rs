@@ -16,7 +16,7 @@ Simply add the corresponding entry to your `Cargo.toml` dependency list:
 
 ```toml
 [dependencies]
-meval = "0.0.5"
+meval = "0.0.6"
 ```
 
 and add this to your crate root:
@@ -37,7 +37,8 @@ fn main() {
 }
 ```
 
-Need to define a Rust function from an expression? No problem, use [`Expr`](http://rekka.github.io/meval-rs/meval/struct.Expr.html)
+Need to define a Rust function from an expression? No problem, use
+[`Expr`][Expr]
 for this and more:
 
 ```rust
@@ -53,7 +54,7 @@ fn main() {
 }
 ```
 
-[`Expr::bind`](http://rekka.github.io/meval-rs/meval/struct.Expr.html#method.bind) returns a boxed closure that is slightly less
+[`Expr::bind`][Expr::bind] returns a boxed closure that is slightly less
 convenient than an unboxed closure since `Box<Fn(f64) -> f64>` does not implement `FnOnce`,
 `Fn` or `FnMut`. So to use it directly as a function argument where a closure is expected, it
 has to be manually dereferenced:
@@ -63,7 +64,7 @@ let func = meval::Expr::from_str("x").unwrap().bind("x").unwrap();
 let r = Some(2.).map(&*func);
 ```
 
-Custom constants and functions? Define a context!
+Custom constants and functions? Define a [`Context`][Context]!
 
 ```rust
 let y = 1.;
@@ -77,7 +78,7 @@ assert_eq!(func(2.), -2. * -1. + 2. + 1.);
 ```
 
 For functions with 2, 3, and N variables use `CustomFunc2`, `CustomFunc3` and `CustomFuncN`
-respectively.
+respectively. See [`Context`][Context] for more options.
 
 If you need a custom function depending on mutable parameters, you will need to use a
 [`Cell`](https://doc.rust-lang.org/stable/std/cell/struct.Cell.html):
@@ -98,7 +99,7 @@ assert_eq!(func(2.), 5.);
 
 `meval` supports basic mathematical operations on floating point numbers:
 
-- binary operators: `+`, `-`, `*`, `/`, `^` (power)
+- binary operators: `+`, `-`, `*`, `/`, `%` (remainder), `^` (power)
 - unary operators: `+`, `-`
 
 It supports custom variables like `x`, `weight`, `C_0`, etc. A variable must start with
@@ -139,3 +140,7 @@ command line scripts. For other similar projects see:
 This project is dual-licensed under the Unlicense and MIT licenses.
 
 You may use this code under the terms of either license.
+
+[Expr]: http://rekka.github.io/meval-rs/meval/struct.Expr.html
+[Expr::bind]: http://rekka.github.io/meval-rs/meval/struct.Expr.html#method.bind
+[Context]: http://rekka.github.io/meval-rs/meval/trait.Context.html
