@@ -1,10 +1,12 @@
 # meval-rs
 
 [![Build Status](https://travis-ci.org/rekka/meval-rs.svg?branch=master)](https://travis-ci.org/rekka/meval-rs)
+[![](http://meritbadge.herokuapp.com/meval)](https://crates.io/crates/meval)
 
 This [Rust] crate provides a simple math expression parsing and evaluation. Its main goal is to
 be convenient to use, while allowing for some flexibility. Currently works only with `f64`
-types.
+types. A typical use case is the configuration of numerical computations in
+Rust, think initial data and boundary conditions, via config files or command line arguments.
 
 ## Documentation
 
