@@ -1,8 +1,28 @@
 //! This [Rust] crate provides a simple math expression parsing and evaluation. Its main goal is to
 //! be convenient to use, while allowing for some flexibility. Currently works only with `f64`
-//! types.
+//! types. A typical use case is the configuration of numerical computations in
+//! Rust, think initial data and boundary conditions, via config files or command line arguments.
 //!
-//! ## Simple examples
+//! # Documentation
+//!
+//! [Full API documentation](http://rekka.github.io/meval-rs/meval/index.html)
+//!
+//! # Installation
+//!
+//! Simply add the corresponding entry to your `Cargo.toml` dependency list:
+//!
+//! ```toml
+//! [dependencies]
+//! meval = "0.0.6"
+//! ```
+//!
+//! and add this to your crate root:
+//!
+//! ```rust
+//! extern crate meval;
+//! ```
+//!
+//! # Simple examples
 //!
 //! ```rust
 //! extern crate meval;
@@ -43,17 +63,22 @@
 //! Custom constants and functions? Define a [`Context`][Context]!
 //!
 //! ```rust
+//! use meval::{Expr, Context};
+//!
 //! let y = 1.;
-//! let expr = meval::Expr::from_str("phi(-2 * zeta + x)").unwrap();
+//! let expr = Expr::from_str("phi(-2 * zeta + x)").unwrap();
 //!
 //! // create a context with function definitions and variables
-//! let ctx = (meval::CustomFunc("phi", |x| x + y), ("zeta", -1.));
-//! // bind function with builtins as well as custom context
-//! let func = expr.bind_with_context((meval::builtin(), ctx), "x").unwrap();
+//! let mut ctx = Context::new(); // built-ins
+//! ctx.func("phi", |x| x + y)
+//!    .var("zeta", -1.);
+//! // bind function with a custom context
+//! let func = expr.bind_with_context(ctx, "x").unwrap();
 //! assert_eq!(func(2.), -2. * -1. + 2. + 1.);
 //! ```
 //!
-//! For functions with 2, 3, and N variables use `CustomFunc2`, `CustomFunc3` and `CustomFuncN`
+//! For functions of 2, 3, and N variables use `Context::func2`, `Context::func3` and
+//! `Context::funcn`,
 //! respectively. See [`Context`][Context] for more options.
 //!
 //! If you need a custom function depending on mutable parameters, you will need to use a
@@ -61,27 +86,32 @@
 //!
 //! ```rust
 //! use std::cell::Cell;
+//! use meval::{Expr, Context};
 //! let y = Cell::new(0.);
-//! let expr = meval::Expr::from_str("phi(x)").unwrap();
+//! let expr = Expr::from_str("phi(x)").unwrap();
 //!
-//! let ctx = meval::CustomFunc("phi", |x| x + y.get());
+//! let mut ctx = Context::empty(); // no built-ins
+//! ctx.func("phi", |x| x + y.get());
+//!
 //! let func = expr.bind_with_context(ctx, "x").unwrap();
 //! assert_eq!(func(2.), 2.);
 //! y.set(3.);
 //! assert_eq!(func(2.), 5.);
 //! ```
 //!
-//! ## Supported expressions
+//! # Supported expressions
 //!
 //! `meval` supports basic mathematical operations on floating point numbers:
 //!
 //! - binary operators: `+`, `-`, `*`, `/`, `%` (remainder), `^` (power)
 //! - unary operators: `+`, `-`
 //!
-//! It supports custom variables like `x`, `weight`, `C_0`, etc. A variable must start with
-//! `[a-zA-Z_]` and can contain only `[a-zA-Z0-9_]`.
+//! It supports custom variables and functions like `x`, `weight`, `C_0`, `f(1)`, etc. A variable
+//! or function name must start with `[a-zA-Z_]` and can contain only `[a-zA-Z0-9_]`. Custom
+//! functions with a variable number of arguments are also supported.
 //!
-//! Build-ins (given by context `meval::builtin()`) currently supported:
+//! Build-ins (given by the context `Context::new()` and when no context provided) currently
+//! supported:
 //!
 //! - functions implemented using functions of the same name in [Rust std library][std-float]:
 //!
@@ -101,7 +131,7 @@
 //!     - `pi`
 //!     - `e`
 //!
-//! ## Related projects
+//! # Related projects
 //!
 //! This is a toy project of mine for learning Rust, and to be hopefully useful when writing
 //! command line scripts. For other similar projects see:
@@ -113,10 +143,11 @@
 //!
 //! [Expr]: struct.Expr.html
 //! [Expr::bind]: struct.Expr.html#method.bind
-//! [Context]: trait.Context.html
+//! [Context]: struct.Context.html
 
 #[macro_use]
 extern crate nom;
+extern crate fnv;
 
 use std::fmt;
 

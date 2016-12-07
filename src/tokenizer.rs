@@ -31,11 +31,7 @@ impl fmt::Display for ParseError {
                 write!(f,
                        "Missing {} right parenthes{}.",
                        i,
-                       if i == 1 {
-                           "is"
-                       } else {
-                           "es"
-                       })
+                       if i == 1 { "is" } else { "es" })
             }
             ParseError::MissingArgument => write!(f, "Missing argument at the end of expression."),
         }
@@ -167,7 +163,8 @@ fn digit_complete(input: &[u8]) -> IResult<&[u8], &[u8]> {
 
 named!(float<usize>, chain!(
         a: digit_complete ~
-        b: complete!(chain!(tag!(".") ~ d: digit_complete?,||{1 + d.map(|s| s.len()).unwrap_or(0)}))? ~
+        b: complete!(chain!(tag!(".") ~ d: digit_complete?,
+                            ||{1 + d.map(|s| s.len()).unwrap_or(0)}))? ~
         e: complete!(exp),
         ||{a.len() + b.unwrap_or(0) + e.unwrap_or(0)}
     )
@@ -347,7 +344,8 @@ mod tests {
     fn test_func() {
         for &s in ["abc(", "u0(", "_034 (", "A_be45EA  ("].iter() {
             assert_eq!(func(s.as_bytes()),
-                       IResult::Done(&b""[..], Token::Func((&s[0..s.len() - 1]).trim().into(), None)));
+                       IResult::Done(&b""[..],
+                                     Token::Func((&s[0..s.len() - 1]).trim().into(), None)));
         }
 
         assert_eq!(func(b""), IResult::Error(Position(Complete, &b""[..])));

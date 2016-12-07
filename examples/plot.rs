@@ -35,8 +35,9 @@ fn main() {
             // create a function of one variable
             let func = match expr.bind("x") {
                 Ok(func) => func,
-                Err(e) =>
-                    return println!("Error when trying to bind variable `x` in {}: {}", arg, e),
+                Err(e) => {
+                    return println!("Error when trying to bind variable `x` in {}: {}", arg, e)
+                }
             };
 
             axes.lines(&xi, xi.iter().map(|&x| func(x)), &[Caption(&arg)]);
