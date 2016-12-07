@@ -246,7 +246,7 @@ impl Expr {
     }
 }
 
-/// Evaluates a string with built-in constants.
+/// Evaluates a string with built-in constants and functions.
 pub fn eval_str<S: AsRef<str>>(expr: S) -> Result<f64, Error> {
     let expr = try!(Expr::from_str(expr));
 
@@ -468,12 +468,28 @@ array_impls! {
     0 1 2 3 4 5 6 7 8
 }
 
+/// A structure for storing variables/constants and functions to be used in an expression.
+///
+/// # Example
+///
+/// ```rust
+/// use meval::{eval_str_with_context, Context};
+///
+/// let mut ctx = Context::new(); // builtins
+/// ctx.var("x", 3.)
+///    .func("f", |x| 2. * x)
+///    .funcn("sum", |xs| xs.iter().sum(), ..);
+///
+/// assert_eq!(eval_str_with_context("pi + sum(1., 2.) + f(x)", &ctx),
+///            Ok(std::f64::consts::PI + 1. + 2. + 2. * 3.));
+/// ```
 pub struct Context<'a> {
     vars: ContextHashMap<String, f64>,
     funcs: ContextHashMap<String, GuardedFunc<'a>>,
 }
 
 impl<'a> Context<'a> {
+    /// Creates a context with built-in constants and functions.
     pub fn new() -> Context<'a> {
         let mut ctx = Context::empty();
         ctx.var("pi", consts::PI);
@@ -505,6 +521,7 @@ impl<'a> Context<'a> {
         ctx
     }
 
+    /// Creates an empty contexts.
     pub fn empty() -> Context<'a> {
         Context {
             vars: ContextHashMap::default(),
@@ -512,11 +529,13 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// Adds a new variable/constant.
     pub fn var<S: Into<String>>(&mut self, var: S, value: f64) -> &mut Self {
         self.vars.insert(var.into(), value);
         self
     }
 
+    /// Adds a new function of one argument.
     pub fn func<S, F>(&mut self, name: S, func: F) -> &mut Self
         where S: Into<String>,
               F: Fn(f64) -> f64 + 'a
@@ -533,6 +552,7 @@ impl<'a> Context<'a> {
         self
     }
 
+    /// Adds a new function of two arguments.
     pub fn func2<S, F>(&mut self, name: S, func: F) -> &mut Self
         where S: Into<String>,
               F: Fn(f64, f64) -> f64 + 'a
@@ -548,6 +568,7 @@ impl<'a> Context<'a> {
         self
     }
 
+    /// Adds a new function of three arguments.
     pub fn func3<S, F>(&mut self, name: S, func: F) -> &mut Self
         where S: Into<String>,
               F: Fn(f64, f64, f64) -> f64 + 'a
@@ -563,6 +584,23 @@ impl<'a> Context<'a> {
         self
     }
 
+    /// Adds a new function of a variable number of arguments.
+    ///
+    /// `n_args` specifies the allowed number of variables by giving an exact number `n` or a range
+    /// `n..m`, `..`, `n..`, `..m`. The range is half-open, exclusive on the right, as is common in
+    /// Rust standard library.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut ctx = meval::Context::empty();
+    ///
+    /// // require exactly 2 arguments
+    /// ctx.funcn("sum_two", |xs| xs[0] + xs[1], 2);
+    ///
+    /// // allow an arbitrary number of arguments
+    /// ctx.funcn("sum", |xs| xs.iter().sum(), ..);
+    /// ```
     pub fn funcn<S, F, N>(&mut self, name: S, func: F, n_args: N) -> &mut Self
         where S: Into<String>,
               F: Fn(&[f64]) -> f64 + 'a,
@@ -575,6 +613,20 @@ impl<'a> Context<'a> {
 
 type GuardedFunc<'a> = Box<Fn(&[f64]) -> Result<f64, FuncEvalError> + 'a>;
 
+/// Trait for types that can specify the number of required arguments for a function with a
+/// variable number of arguments.
+///
+/// # Example
+///
+/// ```rust
+/// let mut ctx = meval::Context::empty();
+///
+/// // require exactly 2 arguments
+/// ctx.funcn("sum_two", |xs| xs[0] + xs[1], 2);
+///
+/// // allow an arbitrary number of arguments
+/// ctx.funcn("sum", |xs| xs.iter().sum(), ..);
+/// ```
 pub trait ArgGuard {
     fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a>;
 }
@@ -599,6 +651,40 @@ impl ArgGuard for std::ops::RangeFrom<usize> {
             } else {
                 Err(FuncEvalError::TooFewArguments)
             }
+        })
+    }
+}
+
+impl ArgGuard for std::ops::RangeTo<usize> {
+    fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a> {
+        Box::new(move |args: &[f64]| {
+            if args.len() < self.end {
+                Ok(func(args))
+            } else {
+                Err(FuncEvalError::TooManyArguments)
+            }
+        })
+    }
+}
+
+impl ArgGuard for std::ops::Range<usize> {
+    fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a> {
+        Box::new(move |args: &[f64]| {
+            if args.len() >= self.start && args.len() < self.end {
+                Ok(func(args))
+            } else if args.len() < self.start {
+                Err(FuncEvalError::TooFewArguments)
+            } else {
+                Err(FuncEvalError::TooManyArguments)
+            }
+        })
+    }
+}
+
+impl ArgGuard for std::ops::RangeFull {
+    fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a> {
+        Box::new(move |args: &[f64]| {
+            Ok(func(args))
         })
     }
 }
