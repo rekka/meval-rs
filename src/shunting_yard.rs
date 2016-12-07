@@ -232,10 +232,15 @@ mod tests {
                             Number(2f64),
                             RParen,
                             RParen]),
-                   Ok(vec![Number(1f64), Func("sin".into(), Some(1)), Number(2f64), Func("cos".into(), Some(1)), Func("max".into(), Some(2))]));
+                   Ok(vec![Number(1f64),
+                           Func("sin".into(), Some(1)),
+                           Number(2f64),
+                           Func("cos".into(), Some(1)),
+                           Func("max".into(), Some(2))]));
 
         assert_eq!(to_rpn(&[Binary(Plus)]), Err(RPNError::NotEnoughOperands(0)));
-        assert_eq!(to_rpn(&[Func("f".into(), None), Binary(Plus), RParen]), Err(RPNError::NotEnoughOperands(0)));
+        assert_eq!(to_rpn(&[Func("f".into(), None), Binary(Plus), RParen]),
+                   Err(RPNError::NotEnoughOperands(0)));
         assert_eq!(to_rpn(&[Var("x".into()), Number(1.)]),
                    Err(RPNError::TooManyOperands));
         assert_eq!(to_rpn(&[LParen]), Err(RPNError::MismatchedLParen(0)));
@@ -243,7 +248,9 @@ mod tests {
         assert_eq!(to_rpn(&[Func("sin".into(), None)]),
                    Err(RPNError::MismatchedLParen(0)));
         assert_eq!(to_rpn(&[Comma]), Err(RPNError::UnexpectedComma(0)));
-        assert_eq!(to_rpn(&[Func("f".into(), None), Comma]), Err(RPNError::MismatchedLParen(0)));
-        assert_eq!(to_rpn(&[Func("f".into(), None), LParen, Comma, RParen]), Err(RPNError::UnexpectedComma(2)));
+        assert_eq!(to_rpn(&[Func("f".into(), None), Comma]),
+                   Err(RPNError::MismatchedLParen(0)));
+        assert_eq!(to_rpn(&[Func("f".into(), None), LParen, Comma, RParen]),
+                   Err(RPNError::UnexpectedComma(2)));
     }
 }

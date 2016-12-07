@@ -1,5 +1,6 @@
 use std::ops::Deref;
 use std::f64::consts;
+use std::collections::HashMap;
 
 use Error;
 use tokenizer::{Token, tokenize};
@@ -79,7 +80,9 @@ impl Expr {
                 }
                 Func(ref n, Some(i)) => {
                     if stack.len() < i {
-                        panic!("eval: stack does not have enough arguments for function token {:?}", token);
+                        panic!("eval: stack does not have enough arguments for function token \
+                                {:?}",
+                               token);
                     }
                     match ctx.eval_func(n, &stack[stack.len() - i..]) {
                         Ok(r) => {
@@ -603,6 +606,135 @@ macro_rules! arg {
     };
 }
 
+pub struct HashContext<'a> {
+    vars: HashMap<String, f64>,
+    funcs: HashMap<String, GuardedFunc<'a>>,
+}
+
+impl<'a> HashContext<'a> {
+    pub fn new() -> HashContext<'a> {
+        let mut ctx = HashContext::empty();
+        ctx.var("pi", consts::PI);
+        ctx.var("e", consts::E);
+
+        ctx.func("sqrt", f64::sqrt);
+        ctx.func("exp", f64::exp);
+        ctx.func("ln", f64::ln);
+        ctx.func("abs", f64::abs);
+        ctx.func("sin", f64::sin);
+        ctx.func("cos", f64::cos);
+        ctx.func("tan", f64::tan);
+        ctx.func("asin", f64::asin);
+        ctx.func("acos", f64::acos);
+        ctx.func("atan", f64::atan);
+        ctx.func("sinh", f64::sinh);
+        ctx.func("cosh", f64::cosh);
+        ctx.func("tanh", f64::tanh);
+        ctx.func("asinh", f64::asinh);
+        ctx.func("acosh", f64::acosh);
+        ctx.func("atanh", f64::atanh);
+        ctx.func("floor", f64::floor);
+        ctx.func("ceil", f64::ceil);
+        ctx.func("round", f64::round);
+        ctx.func("signum", f64::signum);
+        ctx.func2("atan2", f64::atan2);
+        ctx.funcn("max", max_array, 1..);
+        ctx.funcn("min", min_array, 1..);
+        ctx
+    }
+
+    pub fn empty() -> HashContext<'a> {
+        HashContext {
+            vars: HashMap::new(),
+            funcs: HashMap::new(),
+        }
+    }
+
+    pub fn var<S: Into<String>>(&mut self, var: S, value: f64) -> &mut Self {
+        self.vars.insert(var.into(), value);
+        self
+    }
+
+    pub fn func<S, F>(&mut self, name: S, func: F) -> &mut Self
+        where S: Into<String>,
+              F: Fn(f64) -> f64 + 'a
+    {
+
+        self.funcs.insert(name.into(),
+                          Box::new(move |args: &[f64]| {
+            if args.len() == 1 {
+                Ok(func(args[0]))
+            } else {
+                Err(FuncEvalError::NumberArgs(1))
+            }
+        }));
+        self
+    }
+
+    pub fn func2<S, F>(&mut self, name: S, func: F) -> &mut Self
+        where S: Into<String>,
+              F: Fn(f64, f64) -> f64 + 'a
+    {
+        self.funcs.insert(name.into(),
+                          Box::new(move |args: &[f64]| {
+            if args.len() == 2 {
+                Ok(func(args[0], args[1]))
+            } else {
+                Err(FuncEvalError::NumberArgs(2))
+            }
+        }));
+        self
+    }
+
+    pub fn funcn<S, F, N>(&mut self, name: S, func: F, n_args: N) -> &mut Self
+        where S: Into<String>,
+              F: Fn(&[f64]) -> f64 + 'a,
+              N: ArgGuard
+    {
+        self.funcs.insert(name.into(), n_args.to_arg_guard(func));
+        self
+    }
+}
+
+type GuardedFunc<'a> = Box<Fn(&[f64]) -> Result<f64, FuncEvalError> + 'a>;
+
+pub trait ArgGuard {
+    fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a>;
+}
+
+impl ArgGuard for usize {
+    fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a> {
+        Box::new(move |args: &[f64]| {
+            if args.len() == self {
+                Ok(func(args))
+            } else {
+                Err(FuncEvalError::NumberArgs(1))
+            }
+        })
+    }
+}
+
+impl ArgGuard for std::ops::RangeFrom<usize> {
+    fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a> {
+        Box::new(move |args: &[f64]| {
+            if args.len() >= self.start {
+                Ok(func(args))
+            } else {
+                Err(FuncEvalError::TooFewArguments)
+            }
+        })
+    }
+}
+
+impl<'a> Context for HashContext<'a> {
+    fn get_var(&self, name: &str) -> Option<f64> {
+        self.vars.get(name).cloned()
+    }
+    fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
+        self.funcs.get(name).map_or(Err(FuncEvalError::UnknownFunction), |f| f(args))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -622,7 +754,8 @@ mod tests {
         assert_eq!(eval_str("max(1.)"), Ok(1.));
         assert_eq!(eval_str("max(1., 2., -1)"), Ok(2.));
         assert_eq!(eval_str("min(1., 2., -1)"), Ok(-1.));
-        assert_eq!(eval_str("sin(1.) + cos(2.)"), Ok((1f64).sin() + (2f64).cos()));
+        assert_eq!(eval_str("sin(1.) + cos(2.)"),
+                   Ok((1f64).sin() + (2f64).cos()));
         assert_eq!(eval_str("10 % 9"), Ok(10f64 % 9f64));
     }
 
@@ -635,26 +768,28 @@ mod tests {
     fn test_eval_func_ctx() {
         use std::collections::{HashMap, BTreeMap};
         let y = 5.;
-        assert_eq!(eval_str_with_context("phi(2.)",
-                                         CustomFunc("phi", |x| x + y + 3.)), Ok(2. + y + 3.));
-        assert_eq!(eval_str_with_context("phi(2., 3.)",
-                                         CustomFunc2("phi", |x, y| x + y + 3.)), Ok(2. + 3. + 3.));
+        assert_eq!(eval_str_with_context("phi(2.)", CustomFunc("phi", |x| x + y + 3.)),
+                   Ok(2. + y + 3.));
+        assert_eq!(eval_str_with_context("phi(2., 3.)", CustomFunc2("phi", |x, y| x + y + 3.)),
+                   Ok(2. + 3. + 3.));
         assert_eq!(eval_str_with_context("phi(2., 3., 4.)",
                                          CustomFunc3("phi", |x, y, z| x + y * z)),
-                                                    Ok(2. + 3. * 4.));
+                   Ok(2. + 3. * 4.));
         assert_eq!(eval_str_with_context("phi(2., 3.)",
                                          CustomFuncN("phi", |xs: &[f64]| xs[0] + xs[1], 2)),
-                                                    Ok(2. + 3.));
+                   Ok(2. + 3.));
         let mut m = HashMap::new();
         m.insert("x", 2.);
         m.insert("y", 3.);
         assert_eq!(eval_str_with_context("x + y", &m), Ok(2. + 3.));
-        assert_eq!(eval_str_with_context("x + z", m), Err(Error::UnknownVariable("z".into())));
+        assert_eq!(eval_str_with_context("x + z", m),
+                   Err(Error::UnknownVariable("z".into())));
         let mut m = BTreeMap::new();
         m.insert("x", 2.);
         m.insert("y", 3.);
         assert_eq!(eval_str_with_context("x + y", &m), Ok(2. + 3.));
-        assert_eq!(eval_str_with_context("x + z", m), Err(Error::UnknownVariable("z".into())));
+        assert_eq!(eval_str_with_context("x + z", m),
+                   Err(Error::UnknownVariable("z".into())));
     }
 
     #[test]
@@ -695,6 +830,18 @@ mod tests {
         match expr.clone().bind("x") {
             Err(Error::Function(_, FuncEvalError::UnknownFunction)) => {}
             _ => panic!("bind did not error"),
+        }
+    }
+
+    #[test]
+    fn hash_context() {
+        let y = 0.;
+        {
+            let z = 0.;
+
+            let mut ctx = HashContext::new();
+            ctx.var("x", 1.).func("f", |x| x + y).func("g", |x| x + z);
+            ctx.func2("g", |x, y| x + y);
         }
     }
 }
