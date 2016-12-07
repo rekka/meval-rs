@@ -1,6 +1,8 @@
 use std::ops::Deref;
 use std::f64::consts;
-use std::collections::HashMap;
+use fnv::FnvHashMap;
+
+type ContextHashMap<K, V> = FnvHashMap<K, V>;
 
 use Error;
 use tokenizer::{Token, tokenize};
@@ -607,8 +609,8 @@ macro_rules! arg {
 }
 
 pub struct HashContext<'a> {
-    vars: HashMap<String, f64>,
-    funcs: HashMap<String, GuardedFunc<'a>>,
+    vars: ContextHashMap<String, f64>,
+    funcs: ContextHashMap<String, GuardedFunc<'a>>,
 }
 
 impl<'a> HashContext<'a> {
@@ -645,8 +647,8 @@ impl<'a> HashContext<'a> {
 
     pub fn empty() -> HashContext<'a> {
         HashContext {
-            vars: HashMap::new(),
-            funcs: HashMap::new(),
+            vars: ContextHashMap::default(),
+            funcs: ContextHashMap::default(),
         }
     }
 

@@ -117,6 +117,7 @@
 
 #[macro_use]
 extern crate nom;
+extern crate fnv;
 
 use std::fmt;
 
