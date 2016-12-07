@@ -43,7 +43,7 @@ impl Expr {
     }
 
     /// Evaluates the expression with variables given by the argument.
-    pub fn eval<C: Context>(&self, ctx: C) -> Result<f64, Error> {
+    pub fn eval<C: ContextProvider>(&self, ctx: C) -> Result<f64, Error> {
         use tokenizer::Token::*;
         use tokenizer::Operation::*;
 
@@ -131,7 +131,7 @@ impl Expr {
                                     ctx: C,
                                     var: &str)
                                     -> Result<Box<Fn(f64) -> f64 + 'a>, Error>
-        where C: Context + 'a
+        where C: ContextProvider + 'a
     {
         try!(self.check_context(((var, 0.), &ctx)));
         let var = var.to_owned();
@@ -164,7 +164,7 @@ impl Expr {
                                      var1: &str,
                                      var2: &str)
                                      -> Result<Box<Fn(f64, f64) -> f64 + 'a>, Error>
-        where C: Context + 'a
+        where C: ContextProvider + 'a
     {
         try!(self.check_context(([(var1, 0.), (var2, 0.)], &ctx)));
         let var1 = var1.to_owned();
@@ -205,7 +205,7 @@ impl Expr {
                                      var2: &str,
                                      var3: &str)
                                      -> Result<Box<Fn(f64, f64, f64) -> f64 + 'a>, Error>
-        where C: Context + 'a
+        where C: ContextProvider + 'a
     {
         try!(self.check_context(([(var1, 0.), (var2, 0.), (var3, 0.)], &ctx)));
         let var1 = var1.to_owned();
@@ -221,7 +221,7 @@ impl Expr {
     /// # Failure
     ///
     /// Returns `Err` if a missing variable is detected.
-    fn check_context<C: Context>(&self, ctx: C) -> Result<(), Error> {
+    fn check_context<C: ContextProvider>(&self, ctx: C) -> Result<(), Error> {
         for t in self.rpn.iter() {
             match *t {
                 Token::Var(ref name) => {
@@ -256,7 +256,7 @@ pub fn eval_str<S: AsRef<str>>(expr: S) -> Result<f64, Error> {
 /// Evaluates a string with the given context.
 ///
 /// No built-ins are defined in this case.
-pub fn eval_str_with_context<S: AsRef<str>, C: Context>(expr: S, ctx: C) -> Result<f64, Error> {
+pub fn eval_str_with_context<S: AsRef<str>, C: ContextProvider>(expr: S, ctx: C) -> Result<f64, Error> {
     let expr = try!(Expr::from_str(expr));
 
     expr.eval(ctx)
@@ -270,23 +270,27 @@ impl Deref for Expr {
     }
 }
 
-/// Values of variables (and constants) and custom functions for substitution into an evaluated
-/// expression.
+/// A trait of a source of variables (and constants) and functions for substitution into an
+/// evaluated expression.
 ///
-/// The built in context is returned by the `builtin()` function (or the `Builtins` type).
+/// A simplest way to create a custom context provider is to use [`Context`](struct.Context.html).
 ///
-/// Values of variables/constants can be specified by tuples `(name, value)`,
+/// ## Advanced usage
+///
+/// Alternatively, values of variables/constants can be specified by tuples `(name, value)`,
 /// `std::collections::HashMap` or `std::collections::BTreeMap`.
 ///
 /// ```rust
-/// use meval::Context;
+/// use meval::{ContextProvider, Context};
 ///
-/// let bins = meval::builtin(); // built-ins
-/// assert_eq!(bins.get_var("pi"), Some(std::f64::consts::PI));
+/// let mut ctx = Context::new(); // built-ins
+/// ctx.var("x", 2.); // insert a new variable
+/// assert_eq!(ctx.get_var("pi"), Some(std::f64::consts::PI));
 ///
-/// let myvars = ("x", 2.);
+/// let myvars = ("x", 2.); // tuple as a ContextProvider
 /// assert_eq!(myvars.get_var("x"), Some(2f64));
 ///
+/// // HashMap as a ContextProvider
 /// let mut varmap = std::collections::HashMap::new();
 /// varmap.insert("x", 2.);
 /// varmap.insert("y", 3.);
@@ -294,34 +298,35 @@ impl Deref for Expr {
 /// assert_eq!(varmap.get_var("z"), None);
 /// ```
 ///
-/// Custom functions can be defined using one of the `CustomFunc`, `CustomFunc2`, `CustomFunc3` and
-/// `CustomFuncN` tuple structs.
+/// Custom functions can be also defined.
 ///
 /// ```rust
-/// use meval::{Context, CustomFunc2};
+/// use meval::{ContextProvider, Context};
 ///
-/// let cust_func = CustomFunc2("phi", |x, y| x / (y * y));
+/// let mut ctx = Context::new(); // built-ins
+/// ctx.func2("phi", |x, y| x / (y * y));
 ///
-/// assert_eq!(cust_func.eval_func("phi", &[2., 3.]), Ok(2. / (3. * 3.)));
+/// assert_eq!(ctx.eval_func("phi", &[2., 3.]), Ok(2. / (3. * 3.)));
 /// ```
 ///
-/// A `Context` can be built by combining other contexts:
+/// A `ContextProvider` can be built by combining other contexts:
 ///
 /// ```rust
-/// use meval::{Context, CustomFunc2};
+/// use meval::Context;
 ///
-/// let bins = meval::builtin(); // built-ins
+/// let bins = Context::new(); // built-ins
+/// let mut funcs = Context::empty(); // empty context
+/// funcs.func2("phi", |x, y| x / (y * y));
 /// let myvars = ("x", 2.);
-/// let cust_func = CustomFunc2("phi", |x, y| x / (y * y));
 ///
 /// // contexts can be combined using tuples
-/// let ctx = ((myvars, bins), cust_func); // first context has preference if there's duplicity
+/// let ctx = ((myvars, bins), funcs); // first context has preference if there's duplicity
 ///
 /// assert_eq!(meval::eval_str_with_context("x * pi + phi(1., 2.)", ctx).unwrap(), 2. *
 ///             std::f64::consts::PI + 1. / (2. * 2.));
 /// ```
 ///
-pub trait Context {
+pub trait ContextProvider {
     fn get_var(&self, _: &str) -> Option<f64> {
         None
     }
@@ -364,6 +369,7 @@ impl std::error::Error for FuncEvalError {
 /// Built-in functions and constants.
 ///
 /// See the library documentation for the list of built-ins.
+#[doc(hidden)]
 pub struct Builtins;
 
 macro_rules! one_arg {
@@ -404,7 +410,7 @@ fn min_array(xs: &[f64]) -> f64 {
     xs.iter().fold(::std::f64::INFINITY, |m, &x| m.min(x))
 }
 
-impl Context for Builtins {
+impl ContextProvider for Builtins {
     fn get_var(&self, name: &str) -> Option<f64> {
         match name {
             "pi" => Some(consts::PI),
@@ -442,13 +448,14 @@ impl Context for Builtins {
     }
 }
 
-/// Returns the built-in constants and functions in a form that can be used as a `Context`.
-pub fn builtin() -> Builtins {
-    // return [("pi", consts::PI), ("e", consts::E)];
-    Builtins
+/// Returns the built-in constants and functions in a form that can be used as a `ContextProvider`.
+#[doc(hidden)]
+pub fn builtin<'a>() -> Context<'a> {
+    // TODO: cache this (lazy_static)
+    Context::new()
 }
 
-impl<'a, T: Context> Context for &'a T {
+impl<'a, T: ContextProvider> ContextProvider for &'a T {
     fn get_var(&self, name: &str) -> Option<f64> {
         (&**self).get_var(name)
     }
@@ -458,7 +465,7 @@ impl<'a, T: Context> Context for &'a T {
     }
 }
 
-impl<T: Context, S: Context> Context for (T, S) {
+impl<T: ContextProvider, S: ContextProvider> ContextProvider for (T, S) {
     fn get_var(&self, name: &str) -> Option<f64> {
         self.0.get_var(name).or_else(|| self.1.get_var(name))
     }
@@ -470,7 +477,7 @@ impl<T: Context, S: Context> Context for (T, S) {
     }
 }
 
-impl<S: AsRef<str>> Context for (S, f64) {
+impl<S: AsRef<str>> ContextProvider for (S, f64) {
     fn get_var(&self, name: &str) -> Option<f64> {
         if self.0.as_ref() == name {
             Some(self.1)
@@ -481,7 +488,7 @@ impl<S: AsRef<str>> Context for (S, f64) {
 }
 
 /// `std::collections::HashMap` of variables.
-impl<S> Context for std::collections::HashMap<S, f64>
+impl<S> ContextProvider for std::collections::HashMap<S, f64>
     where S: std::hash::Hash + std::cmp::Eq + std::borrow::Borrow<str>
 {
     fn get_var(&self, name: &str) -> Option<f64> {
@@ -490,7 +497,7 @@ impl<S> Context for std::collections::HashMap<S, f64>
 }
 
 /// `std::collections::BTreeMap` of variables.
-impl<S> Context for std::collections::BTreeMap<S, f64>
+impl<S> ContextProvider for std::collections::BTreeMap<S, f64>
     where S: std::cmp::Ord + std::borrow::Borrow<str>
 {
     fn get_var(&self, name: &str) -> Option<f64> {
@@ -499,18 +506,22 @@ impl<S> Context for std::collections::BTreeMap<S, f64>
 }
 
 /// A custom function of one variable.
+#[doc(hidden)]
 pub struct CustomFunc<S, T>(pub S, pub T);
 
 /// A custom function of two variables.
+#[doc(hidden)]
 pub struct CustomFunc2<S, T>(pub S, pub T);
 
 /// A custom function of three variables.
+#[doc(hidden)]
 pub struct CustomFunc3<S, T>(pub S, pub T);
 
 /// A custom function of N variables.
+#[doc(hidden)]
 pub struct CustomFuncN<S, T>(pub S, pub T, pub usize);
 
-impl<S: AsRef<str>, T: Fn(f64) -> f64> Context for CustomFunc<S, T> {
+impl<S: AsRef<str>, T: Fn(f64) -> f64> ContextProvider for CustomFunc<S, T> {
     fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
         if name != self.0.as_ref() {
             return Err(FuncEvalError::UnknownFunction);
@@ -522,7 +533,7 @@ impl<S: AsRef<str>, T: Fn(f64) -> f64> Context for CustomFunc<S, T> {
     }
 }
 
-impl<S: AsRef<str>, T: Fn(f64, f64) -> f64> Context for CustomFunc2<S, T> {
+impl<S: AsRef<str>, T: Fn(f64, f64) -> f64> ContextProvider for CustomFunc2<S, T> {
     fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
         if name != self.0.as_ref() {
             return Err(FuncEvalError::UnknownFunction);
@@ -534,7 +545,7 @@ impl<S: AsRef<str>, T: Fn(f64, f64) -> f64> Context for CustomFunc2<S, T> {
     }
 }
 
-impl<S: AsRef<str>, T: Fn(f64, f64, f64) -> f64> Context for CustomFunc3<S, T> {
+impl<S: AsRef<str>, T: Fn(f64, f64, f64) -> f64> ContextProvider for CustomFunc3<S, T> {
     fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
         if name != self.0.as_ref() {
             return Err(FuncEvalError::UnknownFunction);
@@ -546,7 +557,7 @@ impl<S: AsRef<str>, T: Fn(f64, f64, f64) -> f64> Context for CustomFunc3<S, T> {
     }
 }
 
-impl<S: AsRef<str>, T: Fn(&[f64]) -> f64> Context for CustomFuncN<S, T> {
+impl<S: AsRef<str>, T: Fn(&[f64]) -> f64> ContextProvider for CustomFuncN<S, T> {
     fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
         if name != self.0.as_ref() {
             return Err(FuncEvalError::UnknownFunction);
@@ -559,11 +570,11 @@ impl<S: AsRef<str>, T: Fn(&[f64]) -> f64> Context for CustomFuncN<S, T> {
 }
 
 
-// macro for implementing Context for arrays
+// macro for implementing ContextProvider for arrays
 macro_rules! array_impls {
     ($($N:expr)+) => {
         $(
-            impl<S: AsRef<str>> Context for [(S, f64); $N] {
+            impl<S: AsRef<str>> ContextProvider for [(S, f64); $N] {
                 fn get_var(&self, name: &str) -> Option<f64> {
                     for &(ref n, v) in self.iter() {
                         if n.as_ref() == name {
@@ -608,14 +619,14 @@ macro_rules! arg {
     };
 }
 
-pub struct HashContext<'a> {
+pub struct Context<'a> {
     vars: ContextHashMap<String, f64>,
     funcs: ContextHashMap<String, GuardedFunc<'a>>,
 }
 
-impl<'a> HashContext<'a> {
-    pub fn new() -> HashContext<'a> {
-        let mut ctx = HashContext::empty();
+impl<'a> Context<'a> {
+    pub fn new() -> Context<'a> {
+        let mut ctx = Context::empty();
         ctx.var("pi", consts::PI);
         ctx.var("e", consts::E);
 
@@ -645,8 +656,8 @@ impl<'a> HashContext<'a> {
         ctx
     }
 
-    pub fn empty() -> HashContext<'a> {
-        HashContext {
+    pub fn empty() -> Context<'a> {
+        Context {
             vars: ContextHashMap::default(),
             funcs: ContextHashMap::default(),
         }
@@ -728,7 +739,7 @@ impl ArgGuard for std::ops::RangeFrom<usize> {
     }
 }
 
-impl<'a> Context for HashContext<'a> {
+impl<'a> ContextProvider for Context<'a> {
     fn get_var(&self, name: &str) -> Option<f64> {
         self.vars.get(name).cloned()
     }
@@ -841,7 +852,7 @@ mod tests {
         {
             let z = 0.;
 
-            let mut ctx = HashContext::new();
+            let mut ctx = Context::new();
             ctx.var("x", 1.).func("f", |x| x + y).func("g", |x| x + z);
             ctx.func2("g", |x, y| x + y);
         }

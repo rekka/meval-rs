@@ -5,7 +5,7 @@ extern crate meval;
 
 use test::Bencher;
 use meval::Expr;
-use meval::HashContext;
+use meval::Context;
 
 const EXPR: &'static str = "abs(sin(x + 1) * (x^2 + x + 1))";
 
@@ -28,7 +28,7 @@ fn evaluation(b: &mut Bencher) {
 #[bench]
 fn evaluation_hashcontext(b: &mut Bencher) {
     let expr = Expr::from_str(EXPR).unwrap();
-    let func = expr.bind_with_context(HashContext::new(), "x").unwrap();
+    let func = expr.bind_with_context(Context::new(), "x").unwrap();
     b.iter(|| {
         func(1.);
     });
