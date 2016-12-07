@@ -1,8 +1,28 @@
 //! This [Rust] crate provides a simple math expression parsing and evaluation. Its main goal is to
 //! be convenient to use, while allowing for some flexibility. Currently works only with `f64`
-//! types.
+//! types. A typical use case is the configuration of numerical computations in
+//! Rust, think initial data and boundary conditions, via config files or command line arguments.
 //!
-//! ## Simple examples
+//! # Documentation
+//!
+//! [Full API documentation](http://rekka.github.io/meval-rs/meval/index.html)
+//!
+//! # Installation
+//!
+//! Simply add the corresponding entry to your `Cargo.toml` dependency list:
+//!
+//! ```toml
+//! [dependencies]
+//! meval = "0.0.6"
+//! ```
+//!
+//! and add this to your crate root:
+//!
+//! ```rust
+//! extern crate meval;
+//! ```
+//!
+//! # Simple examples
 //!
 //! ```rust
 //! extern crate meval;
@@ -79,7 +99,7 @@
 //! assert_eq!(func(2.), 5.);
 //! ```
 //!
-//! ## Supported expressions
+//! # Supported expressions
 //!
 //! `meval` supports basic mathematical operations on floating point numbers:
 //!
@@ -111,7 +131,7 @@
 //!     - `pi`
 //!     - `e`
 //!
-//! ## Related projects
+//! # Related projects
 //!
 //! This is a toy project of mine for learning Rust, and to be hopefully useful when writing
 //! command line scripts. For other similar projects see:
