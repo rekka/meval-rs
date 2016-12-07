@@ -256,7 +256,9 @@ pub fn eval_str<S: AsRef<str>>(expr: S) -> Result<f64, Error> {
 /// Evaluates a string with the given context.
 ///
 /// No built-ins are defined in this case.
-pub fn eval_str_with_context<S: AsRef<str>, C: ContextProvider>(expr: S, ctx: C) -> Result<f64, Error> {
+pub fn eval_str_with_context<S: AsRef<str>, C: ContextProvider>(expr: S,
+                                                                ctx: C)
+                                                                -> Result<f64, Error> {
     let expr = try!(Expr::from_str(expr));
 
     expr.eval(ctx)
@@ -465,6 +467,16 @@ impl<'a, T: ContextProvider> ContextProvider for &'a T {
     }
 }
 
+impl<'a, T: ContextProvider> ContextProvider for &'a mut T {
+    fn get_var(&self, name: &str) -> Option<f64> {
+        (&**self).get_var(name)
+    }
+
+    fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
+        (&**self).eval_func(name, args)
+    }
+}
+
 impl<T: ContextProvider, S: ContextProvider> ContextProvider for (T, S) {
     fn get_var(&self, name: &str) -> Option<f64> {
         self.0.get_var(name).or_else(|| self.1.get_var(name))
@@ -505,71 +517,6 @@ impl<S> ContextProvider for std::collections::BTreeMap<S, f64>
     }
 }
 
-/// A custom function of one variable.
-#[doc(hidden)]
-pub struct CustomFunc<S, T>(pub S, pub T);
-
-/// A custom function of two variables.
-#[doc(hidden)]
-pub struct CustomFunc2<S, T>(pub S, pub T);
-
-/// A custom function of three variables.
-#[doc(hidden)]
-pub struct CustomFunc3<S, T>(pub S, pub T);
-
-/// A custom function of N variables.
-#[doc(hidden)]
-pub struct CustomFuncN<S, T>(pub S, pub T, pub usize);
-
-impl<S: AsRef<str>, T: Fn(f64) -> f64> ContextProvider for CustomFunc<S, T> {
-    fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
-        if name != self.0.as_ref() {
-            return Err(FuncEvalError::UnknownFunction);
-        }
-        if args.len() != 1 {
-            return Err(FuncEvalError::NumberArgs(1));
-        }
-        Ok((self.1)(args[0]))
-    }
-}
-
-impl<S: AsRef<str>, T: Fn(f64, f64) -> f64> ContextProvider for CustomFunc2<S, T> {
-    fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
-        if name != self.0.as_ref() {
-            return Err(FuncEvalError::UnknownFunction);
-        }
-        if args.len() != 2 {
-            return Err(FuncEvalError::NumberArgs(2));
-        }
-        Ok((self.1)(args[0], args[1]))
-    }
-}
-
-impl<S: AsRef<str>, T: Fn(f64, f64, f64) -> f64> ContextProvider for CustomFunc3<S, T> {
-    fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
-        if name != self.0.as_ref() {
-            return Err(FuncEvalError::UnknownFunction);
-        }
-        if args.len() != 3 {
-            return Err(FuncEvalError::NumberArgs(3));
-        }
-        Ok((self.1)(args[0], args[1], args[2]))
-    }
-}
-
-impl<S: AsRef<str>, T: Fn(&[f64]) -> f64> ContextProvider for CustomFuncN<S, T> {
-    fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
-        if name != self.0.as_ref() {
-            return Err(FuncEvalError::UnknownFunction);
-        }
-        if args.len() != self.2 {
-            return Err(FuncEvalError::NumberArgs(self.2));
-        }
-        Ok((self.1)(args))
-    }
-}
-
-
 // macro for implementing ContextProvider for arrays
 macro_rules! array_impls {
     ($($N:expr)+) => {
@@ -590,33 +537,6 @@ macro_rules! array_impls {
 
 array_impls! {
     0 1 2 3 4 5 6 7 8
-}
-
-macro_rules! arg {
-    () => {
-        $crate::ExprContext::new()
-    };
-
-    ($var:ident: $value:expr) => {
-        {
-            let mut ctx = $crate::ExprContext::new();
-            ctx.insert(stringify!($var).into(), $value);
-            ctx
-        }
-    };
-
-    ($($var:ident: $value:expr),*) => {
-        {
-            let mut ctx = $crate::ExprContext::new();
-            $(
-                ctx.insert(stringify!($var).into(), $value);
-            )*
-            ctx
-        }
-    };
-    ($($var:ident: $value:expr),*,) => {
-        arg!($($var: $value),*)
-    };
 }
 
 pub struct Context<'a> {
@@ -699,6 +619,21 @@ impl<'a> Context<'a> {
         self
     }
 
+    pub fn func3<S, F>(&mut self, name: S, func: F) -> &mut Self
+        where S: Into<String>,
+              F: Fn(f64, f64, f64) -> f64 + 'a
+    {
+        self.funcs.insert(name.into(),
+                          Box::new(move |args: &[f64]| {
+            if args.len() == 3 {
+                Ok(func(args[0], args[1], args[2]))
+            } else {
+                Err(FuncEvalError::NumberArgs(3))
+            }
+        }));
+        self
+    }
+
     pub fn funcn<S, F, N>(&mut self, name: S, func: F, n_args: N) -> &mut Self
         where S: Into<String>,
               F: Fn(&[f64]) -> f64 + 'a,
@@ -759,9 +694,6 @@ mod tests {
         assert_eq!(eval_str("2 + (3 + 4)"), Ok(9.));
         assert_eq!(eval_str("-2^(4 - 3) * (3 + 4)"), Ok(-14.));
         assert_eq!(eval_str("a + 3"), Err(Error::UnknownVariable("a".into())));
-        // assert_eq!(eval_str_with_context("a + 3", arg! {a: 2.}), Ok(5.));
-        // assert_eq!(eval_str_with_context("hey ^ no", arg! {hey: 2., no: 8.}),
-        //            Ok(256.));
         assert_eq!(eval_str("round(sin (pi) * cos(0))"), Ok(0.));
         assert_eq!(eval_str("round( sqrt(3^2 + 4^2)) "), Ok(5.));
         assert_eq!(eval_str("max(1.)"), Ok(1.));
@@ -781,15 +713,17 @@ mod tests {
     fn test_eval_func_ctx() {
         use std::collections::{HashMap, BTreeMap};
         let y = 5.;
-        assert_eq!(eval_str_with_context("phi(2.)", CustomFunc("phi", |x| x + y + 3.)),
+        assert_eq!(eval_str_with_context("phi(2.)", Context::new().func("phi", |x| x + y + 3.)),
                    Ok(2. + y + 3.));
-        assert_eq!(eval_str_with_context("phi(2., 3.)", CustomFunc2("phi", |x, y| x + y + 3.)),
+        assert_eq!(eval_str_with_context("phi(2., 3.)",
+                                         Context::new().func2("phi", |x, y| x + y + 3.)),
                    Ok(2. + 3. + 3.));
         assert_eq!(eval_str_with_context("phi(2., 3., 4.)",
-                                         CustomFunc3("phi", |x, y, z| x + y * z)),
+                                         Context::new().func3("phi", |x, y, z| x + y * z)),
                    Ok(2. + 3. * 4.));
         assert_eq!(eval_str_with_context("phi(2., 3.)",
-                                         CustomFuncN("phi", |xs: &[f64]| xs[0] + xs[1], 2)),
+                                         Context::new().funcn("phi",
+                                                              |xs: &[f64]| xs[0] + xs[1], 2)),
                    Ok(2. + 3.));
         let mut m = HashMap::new();
         m.insert("x", 2.);
