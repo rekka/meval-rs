@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.org/rekka/meval-rs.svg?branch=master)](https://travis-ci.org/rekka/meval-rs)
 [![](http://meritbadge.herokuapp.com/meval)](https://crates.io/crates/meval)
+![meval at docs.rs](https://docs.rs/meval/badge.svg)
 
 [Expr]: http://rekka.github.io/meval-rs/meval/struct.Expr.html
 [Expr::bind]: http://rekka.github.io/meval-rs/meval/struct.Expr.html#method.bind
@@ -14,7 +15,9 @@ Rust, think initial data and boundary conditions, via config files or command li
 
 ## Documentation
 
-[Full API documentation](http://rekka.github.io/meval-rs/meval/index.html)
+- [Full API documentation (crates.io)](https://docs.rs/meval)
+
+- [Full API documentation (master)](http://rekka.github.io/meval-rs/meval/index.html)
 
 ## Installation
 

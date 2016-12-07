@@ -5,7 +5,9 @@
 //!
 //! # Documentation
 //!
-//! [Full API documentation](http://rekka.github.io/meval-rs/meval/index.html)
+//! - [Full API documentation (crates.io)](https://docs.rs/meval)
+//!
+//! - [Full API documentation (master)](http://rekka.github.io/meval-rs/meval/index.html)
 //!
 //! # Installation
 //!
