@@ -12,8 +12,8 @@ use std;
 
 /// Representation of a parsed expression.
 ///
-/// The expression is internally stored in [reverse Polish notation (RPN)][RPN] as a sequence of
-/// `Token`s.
+/// The expression is internally stored in the [reverse Polish notation (RPN)][RPN] as a sequence
+/// of `Token`s.
 ///
 /// Methods `bind`, `bind_with_context`, `bind2`, ... can be used to create (boxed) closures from
 /// the expression that then can be passed around and used as any other `Fn` closures.  A boxed
@@ -22,8 +22,9 @@ use std;
 /// function argument where a closure is expected, it has to be manually dereferenced:
 ///
 /// ```rust
-/// let func = meval::Expr::from_str("x").unwrap().bind("x").unwrap();
+/// let func = meval::Expr::from_str("x^2").unwrap().bind("x").unwrap();
 /// let r = Some(2.).map(&*func);
+/// assert_eq!(r, Some(4.));
 /// ```
 ///
 /// [RPN]: https://en.wikipedia.org/wiki/Reverse_Polish_notation
