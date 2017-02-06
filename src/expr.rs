@@ -28,7 +28,7 @@ use std;
 /// ```
 ///
 /// [RPN]: https://en.wikipedia.org/wiki/Reverse_Polish_notation
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Expr {
     rpn: Vec<Token>,
 }
@@ -684,9 +684,7 @@ impl ArgGuard for std::ops::Range<usize> {
 
 impl ArgGuard for std::ops::RangeFull {
     fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a> {
-        Box::new(move |args: &[f64]| {
-            Ok(func(args))
-        })
+        Box::new(move |args: &[f64]| Ok(func(args)))
     }
 }
 
@@ -696,6 +694,76 @@ impl<'a> ContextProvider for Context<'a> {
     }
     fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
         self.funcs.get(name).map_or(Err(FuncEvalError::UnknownFunction), |f| f(args))
+    }
+}
+
+#[cfg(feature = "serde")]
+pub mod de {
+    use serde;
+    use super::Expr;
+    use std::fmt;
+    use tokenizer::Token;
+
+    impl serde::Deserialize for Expr {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where D: serde::Deserializer
+        {
+            struct ExprVisitor;
+
+            impl serde::de::Visitor for ExprVisitor {
+                type Value = Expr;
+
+                fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                    formatter.write_str("a math expression")
+                }
+
+                fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                    where E: serde::de::Error
+                {
+                    Expr::from_str(v).map_err(serde::de::Error::custom)
+                }
+
+                fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+                    where E: serde::de::Error
+                {
+                    Ok(Expr { rpn: vec![Token::Number(v)] })
+                }
+
+                fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+                    where E: serde::de::Error
+                {
+                    Ok(Expr { rpn: vec![Token::Number(v as f64)] })
+                }
+
+                fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+                    where E: serde::de::Error
+                {
+                    Ok(Expr { rpn: vec![Token::Number(v as f64)] })
+                }
+            }
+
+            deserializer.deserialize_str(ExprVisitor)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use serde_test;
+        #[test]
+        fn test_deserialization() {
+            use serde_test::Token;
+            let expr = Expr::from_str("sin(x)").unwrap();
+
+            serde_test::assert_de_tokens(&expr, &[Token::Str("sin(x)")]);
+            serde_test::assert_de_tokens(&expr, &[Token::String(String::from("sin(x)"))]);
+
+            let expr = Expr::from_str("5").unwrap();
+
+            serde_test::assert_de_tokens(&expr, &[Token::F64(5.)]);
+            serde_test::assert_de_tokens(&expr, &[Token::U8(5)]);
+            serde_test::assert_de_tokens(&expr, &[Token::I8(5)]);
+        }
     }
 }
 

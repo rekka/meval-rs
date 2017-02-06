@@ -133,6 +133,22 @@
 //!     - `pi`
 //!     - `e`
 //!
+//! # Deserialization
+//!
+//! [`Expr`][Expr] supports deserialization using the [serde] library.
+//!
+//! ```rust
+//! extern crate serde_json;
+//! extern crate meval;
+//! use meval::{Expr, Context};
+//!
+//! fn main() {
+//!     let p: Expr = serde_json::from_str(r#""2 + 3""#).unwrap();
+//!     assert_eq!(p.eval(Context::new()).unwrap(), 5.);
+//! }
+//!
+//! ```
+//!
 //! # Related projects
 //!
 //! This is a toy project of mine for learning Rust, and to be hopefully useful when writing
@@ -146,10 +162,15 @@
 //! [Expr]: struct.Expr.html
 //! [Expr::bind]: struct.Expr.html#method.bind
 //! [Context]: struct.Context.html
+//! [serde]: https://crates.io/crates/serde
 
 #[macro_use]
 extern crate nom;
 extern crate fnv;
+#[cfg(feature = "serde")]
+extern crate serde;
+#[cfg(test)]
+extern crate serde_test;
 
 use std::fmt;
 

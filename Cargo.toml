@@ -13,6 +13,13 @@ version = "0.0.7"
 [dependencies]
 fnv = "1.0.5"
 nom = "1.0.0"
+serde = { version = "0.9", optional = true }
 
 [dev-dependencies]
 gnuplot = "0.0.18"
+serde_test = "0.9"
+serde_json = "0.9"
+
+[features]
+default = ["serde"]
+
