@@ -39,6 +39,14 @@ fn evaluation_hashcontext(b: &mut Bencher) {
     });
 }
 
+#[bench]
+fn default_context(b: &mut Bencher) {
+    let expr = Expr::from_str("1 + 2 * 3").unwrap();
+    b.iter(|| {
+        expr.eval(Context::default())
+    });
+}
+
 macro_rules! one_arg {
     ($args:expr, $func:ident) => {
         if $args.len() == 1 {

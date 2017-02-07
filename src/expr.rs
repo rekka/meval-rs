@@ -612,6 +612,12 @@ impl<'a> Context<'a> {
     }
 }
 
+impl<'a> Default for Context<'a> {
+    fn default() -> Self {
+        Context::new()
+    }
+}
+
 type GuardedFunc<'a> = Box<Fn(&[f64]) -> Result<f64, FuncEvalError> + 'a>;
 
 /// Trait for types that can specify the number of required arguments for a function with a
