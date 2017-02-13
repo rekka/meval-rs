@@ -18,7 +18,8 @@ serde = { version = "0.9", optional = true }
 [dev-dependencies]
 gnuplot = "0.0.18"
 serde_test = "0.9"
-serde_json = "0.9"
+serde_derive = "0.9"
+toml = "0.3"
 
 [features]
 default = ["serde"]

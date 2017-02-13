@@ -135,16 +135,36 @@
 //!
 //! # Deserialization
 //!
-//! [`Expr`][Expr] supports deserialization using the [serde] library.
+//! [`Expr`][Expr] supports deserialization using the [serde] library to make flexible
+//! configuration easy to set up.
 //!
 //! ```rust
-//! extern crate serde_json;
+//! #[macro_use]
+//! extern crate serde_derive;
+//! extern crate toml;
 //! extern crate meval;
 //! use meval::{Expr, Context};
 //!
+//! #[derive(Deserialize)]
+//! struct Ode {
+//!     #[serde(deserialize_with = "meval::de::as_f64")]
+//!     x0: f64,
+//!     #[serde(deserialize_with = "meval::de::as_f64")]
+//!     t0: f64,
+//!     f: Expr,
+//! }
+//!
 //! fn main() {
-//!     let p: Expr = serde_json::from_str(r#""2 + 3""#).unwrap();
-//!     assert_eq!(p.eval().unwrap(), 5.);
+//!     let config = r#"
+//!         x0 = "cos(1.)"
+//!         t0 = 2
+//!         f = "sin(x)"
+//!     "#;
+//!     let ode: Ode = toml::from_str(config).unwrap();
+//!
+//!     assert_eq!(ode.x0, 1f64.cos());
+//!     assert_eq!(ode.t0, 2f64);
+//!     assert_eq!(ode.f.bind("x").unwrap()(2.), 2f64.sin());
 //! }
 //!
 //! ```
@@ -177,6 +197,7 @@ use std::fmt;
 pub mod tokenizer;
 pub mod shunting_yard;
 mod expr;
+pub mod de;
 
 pub use expr::*;
 pub use shunting_yard::RPNError;

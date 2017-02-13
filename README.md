@@ -53,7 +53,7 @@ for this and more:
 extern crate meval;
 
 fn main() {
-    let expr = meval::Expr::from_str("sin(pi * x)").unwrap();
+    let expr: meval::Expr = "sin(pi * x)".parse().unwrap();
     let func = expr.bind("x").unwrap();
 
     let vs: Vec<_> = (0..100+1).map(|i| func(i as f64 / 100.)).collect();
@@ -68,7 +68,7 @@ convenient than an unboxed closure since `Box<Fn(f64) -> f64>` does not implemen
 has to be manually dereferenced:
 
 ```rust
-let func = meval::Expr::from_str("x").unwrap().bind("x").unwrap();
+let func = "x".parse::<meval::Expr>().unwrap().bind("x").unwrap();
 let r = Some(2.).map(&*func);
 ```
 
@@ -78,7 +78,7 @@ Custom constants and functions? Define a [`Context`][Context]!
 use meval::{Expr, Context};
 
 let y = 1.;
-let expr = Expr::from_str("phi(-2 * zeta + x)").unwrap();
+let expr: Expr = "phi(-2 * zeta + x)".parse().unwrap();
 
 // create a context with function definitions and variables
 let mut ctx = Context::new(); // built-ins
@@ -100,7 +100,7 @@ If you need a custom function depending on mutable parameters, you will need to 
 use std::cell::Cell;
 use meval::{Expr, Context};
 let y = Cell::new(0.);
-let expr = Expr::from_str("phi(x)").unwrap();
+let expr: Expr = "phi(x)".parse().unwrap();
 
 let mut ctx = Context::empty(); // no built-ins
 ctx.func("phi", |x| x + y.get());
@@ -143,6 +143,42 @@ supported:
     - `pi`
     - `e`
 
+## Deserialization
+
+[`Expr`][Expr] supports deserialization using the [serde] library to make flexible
+configuration easy to set up.
+
+```rust
+#[macro_use]
+extern crate serde_derive;
+extern crate toml;
+extern crate meval;
+use meval::{Expr, Context};
+
+#[derive(Deserialize)]
+struct Ode {
+    #[serde(deserialize_with = "meval::de::as_f64")]
+    x0: f64,
+    #[serde(deserialize_with = "meval::de::as_f64")]
+    t0: f64,
+    f: Expr,
+}
+
+fn main() {
+    let config = r#"
+        x0 = "cos(1.)"
+        t0 = 2
+        f = "sin(x)"
+    "#;
+    let ode: Ode = toml::from_str(config).unwrap();
+
+    assert_eq!(ode.x0, 1f64.cos());
+    assert_eq!(ode.t0, 2f64);
+    assert_eq!(ode.f.bind("x").unwrap()(2.), 2f64.sin());
+}
+
+```
+
 ## Related projects
 
 This is a toy project of mine for learning Rust, and to be hopefully useful when writing
@@ -156,6 +192,7 @@ command line scripts. For other similar projects see:
 [Expr]: struct.Expr.html
 [Expr::bind]: struct.Expr.html#method.bind
 [Context]: struct.Context.html
+[serde]: https://crates.io/crates/serde
 
 ## License
 
