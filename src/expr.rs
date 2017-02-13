@@ -1,6 +1,7 @@
 use std::ops::Deref;
 use std::f64::consts;
 use fnv::FnvHashMap;
+use std::str::FromStr;
 
 type ContextHashMap<K, V> = FnvHashMap<K, V>;
 
@@ -22,7 +23,7 @@ use std;
 /// function argument where a closure is expected, it has to be manually dereferenced:
 ///
 /// ```rust
-/// let func = meval::Expr::from_str("x^2").unwrap().bind("x").unwrap();
+/// let func = "x^2".parse::<meval::Expr>().unwrap().bind("x").unwrap();
 /// let r = Some(2.).map(&*func);
 /// assert_eq!(r, Some(4.));
 /// ```
@@ -34,14 +35,6 @@ pub struct Expr {
 }
 
 impl Expr {
-    /// Constructs an expression by parsing a string.
-    pub fn from_str<S: AsRef<str>>(string: S) -> Result<Expr, Error> {
-        let tokens = try!(tokenize(string));
-
-        let rpn = try!(to_rpn(&tokens));
-
-        Ok(Expr { rpn: rpn })
-    }
 
     /// Evaluates the expression with variables given by the argument.
     pub fn eval(&self) -> Result<f64, Error> {
@@ -254,9 +247,21 @@ impl Expr {
 
 /// Evaluates a string with built-in constants and functions.
 pub fn eval_str<S: AsRef<str>>(expr: S) -> Result<f64, Error> {
-    let expr = try!(Expr::from_str(expr));
+    let expr = try!(Expr::from_str(expr.as_ref()));
 
     expr.eval_with_context(builtin())
+}
+
+impl FromStr for Expr {
+    type Err = Error;
+    /// Constructs an expression by parsing a string.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let tokens = try!(tokenize(s));
+
+        let rpn = try!(to_rpn(&tokens));
+
+        Ok(Expr { rpn: rpn })
+    }
 }
 
 /// Evaluates a string with the given context.
@@ -265,7 +270,7 @@ pub fn eval_str<S: AsRef<str>>(expr: S) -> Result<f64, Error> {
 pub fn eval_str_with_context<S: AsRef<str>, C: ContextProvider>(expr: S,
                                                                 ctx: C)
                                                                 -> Result<f64, Error> {
-    let expr = try!(Expr::from_str(expr));
+    let expr = try!(Expr::from_str(expr.as_ref()));
 
     expr.eval_with_context(ctx)
 }
@@ -708,6 +713,7 @@ pub mod de {
     use super::Expr;
     use std::fmt;
     use tokenizer::Token;
+    use std::str::FromStr;
 
     impl serde::Deserialize for Expr {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -776,6 +782,7 @@ pub mod de {
 mod tests {
     use super::*;
     use Error;
+    use std::str::FromStr;
 
     #[test]
     fn test_eval() {

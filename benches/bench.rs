@@ -17,13 +17,13 @@ const EXPR: &'static str = "abs(sin(x + 1) * (x^2 + x + 1))";
 #[bench]
 fn parsing(b: &mut Bencher) {
     b.iter(|| {
-        Expr::from_str(EXPR).unwrap();
+        EXPR.parse::<Expr>().unwrap();
     });
 }
 
 #[bench]
 fn evaluation_matchcontext(b: &mut Bencher) {
-    let expr = Expr::from_str(EXPR).unwrap();
+    let expr: Expr = EXPR.parse().unwrap();
     let func = expr.bind_with_context(MatchBuiltins, "x").unwrap();
     b.iter(|| {
         func(1.);
@@ -32,7 +32,7 @@ fn evaluation_matchcontext(b: &mut Bencher) {
 
 #[bench]
 fn evaluation_hashcontext(b: &mut Bencher) {
-    let expr = Expr::from_str(EXPR).unwrap();
+    let expr: Expr = EXPR.parse().unwrap();
     let func = expr.bind_with_context(Context::new(), "x").unwrap();
     b.iter(|| {
         func(1.);
@@ -41,9 +41,9 @@ fn evaluation_hashcontext(b: &mut Bencher) {
 
 #[bench]
 fn default_context(b: &mut Bencher) {
-    let expr = Expr::from_str("1 + 2 * 3").unwrap();
+    let expr: Expr = "1 + 2 * 3".parse().unwrap();
     b.iter(|| {
-        expr.eval(Context::default())
+        expr.eval()
     });
 }
 

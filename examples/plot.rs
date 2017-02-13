@@ -28,7 +28,7 @@ fn main() {
 
         for arg in args {
             // parse expression
-            let expr = match Expr::from_str(&arg) {
+            let expr = match arg.parse::<Expr>() {
                 Ok(expr) => expr,
                 Err(e) => return println!("Error when evaluating `{}`: {}", arg, e),
             };

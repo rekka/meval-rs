@@ -43,7 +43,7 @@
 //! extern crate meval;
 //!
 //! fn main() {
-//!     let expr = meval::Expr::from_str("sin(pi * x)").unwrap();
+//!     let expr: meval::Expr = "sin(pi * x)".parse().unwrap();
 //!     let func = expr.bind("x").unwrap();
 //!
 //!     let vs: Vec<_> = (0..100+1).map(|i| func(i as f64 / 100.)).collect();
@@ -58,7 +58,7 @@
 //! has to be manually dereferenced:
 //!
 //! ```rust
-//! let func = meval::Expr::from_str("x").unwrap().bind("x").unwrap();
+//! let func = "x".parse::<meval::Expr>().unwrap().bind("x").unwrap();
 //! let r = Some(2.).map(&*func);
 //! ```
 //!
@@ -68,7 +68,7 @@
 //! use meval::{Expr, Context};
 //!
 //! let y = 1.;
-//! let expr = Expr::from_str("phi(-2 * zeta + x)").unwrap();
+//! let expr: Expr = "phi(-2 * zeta + x)".parse().unwrap();
 //!
 //! // create a context with function definitions and variables
 //! let mut ctx = Context::new(); // built-ins
@@ -90,7 +90,7 @@
 //! use std::cell::Cell;
 //! use meval::{Expr, Context};
 //! let y = Cell::new(0.);
-//! let expr = Expr::from_str("phi(x)").unwrap();
+//! let expr: Expr = "phi(x)".parse().unwrap();
 //!
 //! let mut ctx = Context::empty(); // no built-ins
 //! ctx.func("phi", |x| x + y.get());
