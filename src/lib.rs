@@ -144,7 +144,7 @@
 //!
 //! fn main() {
 //!     let p: Expr = serde_json::from_str(r#""2 + 3""#).unwrap();
-//!     assert_eq!(p.eval(Context::new()).unwrap(), 5.);
+//!     assert_eq!(p.eval().unwrap(), 5.);
 //! }
 //!
 //! ```

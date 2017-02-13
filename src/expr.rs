@@ -44,7 +44,12 @@ impl Expr {
     }
 
     /// Evaluates the expression with variables given by the argument.
-    pub fn eval<C: ContextProvider>(&self, ctx: C) -> Result<f64, Error> {
+    pub fn eval(&self) -> Result<f64, Error> {
+        self.eval_with_context(builtin())
+    }
+
+    /// Evaluates the expression with variables given by the argument.
+    pub fn eval_with_context<C: ContextProvider>(&self, ctx: C) -> Result<f64, Error> {
         use tokenizer::Token::*;
         use tokenizer::Operation::*;
 
@@ -136,7 +141,7 @@ impl Expr {
     {
         try!(self.check_context(((var, 0.), &ctx)));
         let var = var.to_owned();
-        return Ok(Box::new(move |x| self.eval(((&var, x), &ctx)).expect("Expr::bind")));
+        return Ok(Box::new(move |x| self.eval_with_context(((&var, x), &ctx)).expect("Expr::bind")));
     }
 
     /// Creates a function of two variables based on this expression, with default constants and
@@ -171,7 +176,7 @@ impl Expr {
         let var1 = var1.to_owned();
         let var2 = var2.to_owned();
         return Ok(Box::new(move |x, y| {
-            self.eval(([(&var1, x), (&var2, y)], &ctx)).expect("Expr::bind2")
+            self.eval_with_context(([(&var1, x), (&var2, y)], &ctx)).expect("Expr::bind2")
         }));
     }
 
@@ -213,7 +218,7 @@ impl Expr {
         let var2 = var2.to_owned();
         let var3 = var3.to_owned();
         return Ok(Box::new(move |x, y, z| {
-            self.eval(([(&var1, x), (&var2, y), (&var3, z)], &ctx)).expect("Expr::bind3")
+            self.eval_with_context(([(&var1, x), (&var2, y), (&var3, z)], &ctx)).expect("Expr::bind3")
         }));
     }
 
@@ -251,7 +256,7 @@ impl Expr {
 pub fn eval_str<S: AsRef<str>>(expr: S) -> Result<f64, Error> {
     let expr = try!(Expr::from_str(expr));
 
-    expr.eval(builtin())
+    expr.eval_with_context(builtin())
 }
 
 /// Evaluates a string with the given context.
@@ -262,7 +267,7 @@ pub fn eval_str_with_context<S: AsRef<str>, C: ContextProvider>(expr: S,
                                                                 -> Result<f64, Error> {
     let expr = try!(Expr::from_str(expr));
 
-    expr.eval(ctx)
+    expr.eval_with_context(ctx)
 }
 
 impl Deref for Expr {
@@ -609,12 +614,6 @@ impl<'a> Context<'a> {
     {
         self.funcs.insert(name.into(), n_args.to_arg_guard(func));
         self
-    }
-}
-
-impl<'a> Default for Context<'a> {
-    fn default() -> Self {
-        Context::new()
     }
 }
 
