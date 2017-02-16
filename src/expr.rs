@@ -2,6 +2,7 @@ use std::ops::Deref;
 use std::f64::consts;
 use fnv::FnvHashMap;
 use std::str::FromStr;
+use std::rc::Rc;
 
 type ContextHashMap<K, V> = FnvHashMap<K, V>;
 
@@ -553,7 +554,7 @@ impl<'a> Context<'a> {
     {
 
         self.funcs.insert(name.into(),
-                          Box::new(move |args: &[f64]| {
+                          Rc::new(move |args: &[f64]| {
             if args.len() == 1 {
                 Ok(func(args[0]))
             } else {
@@ -569,7 +570,7 @@ impl<'a> Context<'a> {
               F: Fn(f64, f64) -> f64 + 'a
     {
         self.funcs.insert(name.into(),
-                          Box::new(move |args: &[f64]| {
+                          Rc::new(move |args: &[f64]| {
             if args.len() == 2 {
                 Ok(func(args[0], args[1]))
             } else {
@@ -585,7 +586,7 @@ impl<'a> Context<'a> {
               F: Fn(f64, f64, f64) -> f64 + 'a
     {
         self.funcs.insert(name.into(),
-                          Box::new(move |args: &[f64]| {
+                          Rc::new(move |args: &[f64]| {
             if args.len() == 3 {
                 Ok(func(args[0], args[1], args[2]))
             } else {
@@ -622,7 +623,7 @@ impl<'a> Context<'a> {
     }
 }
 
-type GuardedFunc<'a> = Box<Fn(&[f64]) -> Result<f64, FuncEvalError> + 'a>;
+type GuardedFunc<'a> = Rc<Fn(&[f64]) -> Result<f64, FuncEvalError> + 'a>;
 
 /// Trait for types that can specify the number of required arguments for a function with a
 /// variable number of arguments.
@@ -644,7 +645,7 @@ pub trait ArgGuard {
 
 impl ArgGuard for usize {
     fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a> {
-        Box::new(move |args: &[f64]| {
+        Rc::new(move |args: &[f64]| {
             if args.len() == self {
                 Ok(func(args))
             } else {
@@ -656,7 +657,7 @@ impl ArgGuard for usize {
 
 impl ArgGuard for std::ops::RangeFrom<usize> {
     fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a> {
-        Box::new(move |args: &[f64]| {
+        Rc::new(move |args: &[f64]| {
             if args.len() >= self.start {
                 Ok(func(args))
             } else {
@@ -668,7 +669,7 @@ impl ArgGuard for std::ops::RangeFrom<usize> {
 
 impl ArgGuard for std::ops::RangeTo<usize> {
     fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a> {
-        Box::new(move |args: &[f64]| {
+        Rc::new(move |args: &[f64]| {
             if args.len() < self.end {
                 Ok(func(args))
             } else {
@@ -680,7 +681,7 @@ impl ArgGuard for std::ops::RangeTo<usize> {
 
 impl ArgGuard for std::ops::Range<usize> {
     fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a> {
-        Box::new(move |args: &[f64]| {
+        Rc::new(move |args: &[f64]| {
             if args.len() >= self.start && args.len() < self.end {
                 Ok(func(args))
             } else if args.len() < self.start {
@@ -694,7 +695,7 @@ impl ArgGuard for std::ops::Range<usize> {
 
 impl ArgGuard for std::ops::RangeFull {
     fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a> {
-        Box::new(move |args: &[f64]| Ok(func(args)))
+        Rc::new(move |args: &[f64]| Ok(func(args)))
     }
 }
 
