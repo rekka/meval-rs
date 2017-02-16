@@ -495,6 +495,7 @@ array_impls! {
 /// assert_eq!(eval_str_with_context("pi + sum(1., 2.) + f(x)", &ctx),
 ///            Ok(std::f64::consts::PI + 1. + 2. + 2. * 3.));
 /// ```
+#[derive(Clone)]
 pub struct Context<'a> {
     vars: ContextHashMap<String, f64>,
     funcs: ContextHashMap<String, GuardedFunc<'a>>,
@@ -503,34 +504,38 @@ pub struct Context<'a> {
 impl<'a> Context<'a> {
     /// Creates a context with built-in constants and functions.
     pub fn new() -> Context<'a> {
-        let mut ctx = Context::empty();
-        ctx.var("pi", consts::PI);
-        ctx.var("e", consts::E);
+        thread_local!(static DEFAULT_CONTEXT: Context<'static> = {
+            let mut ctx = Context::empty();
+            ctx.var("pi", consts::PI);
+            ctx.var("e", consts::E);
 
-        ctx.func("sqrt", f64::sqrt);
-        ctx.func("exp", f64::exp);
-        ctx.func("ln", f64::ln);
-        ctx.func("abs", f64::abs);
-        ctx.func("sin", f64::sin);
-        ctx.func("cos", f64::cos);
-        ctx.func("tan", f64::tan);
-        ctx.func("asin", f64::asin);
-        ctx.func("acos", f64::acos);
-        ctx.func("atan", f64::atan);
-        ctx.func("sinh", f64::sinh);
-        ctx.func("cosh", f64::cosh);
-        ctx.func("tanh", f64::tanh);
-        ctx.func("asinh", f64::asinh);
-        ctx.func("acosh", f64::acosh);
-        ctx.func("atanh", f64::atanh);
-        ctx.func("floor", f64::floor);
-        ctx.func("ceil", f64::ceil);
-        ctx.func("round", f64::round);
-        ctx.func("signum", f64::signum);
-        ctx.func2("atan2", f64::atan2);
-        ctx.funcn("max", max_array, 1..);
-        ctx.funcn("min", min_array, 1..);
-        ctx
+            ctx.func("sqrt", f64::sqrt);
+            ctx.func("exp", f64::exp);
+            ctx.func("ln", f64::ln);
+            ctx.func("abs", f64::abs);
+            ctx.func("sin", f64::sin);
+            ctx.func("cos", f64::cos);
+            ctx.func("tan", f64::tan);
+            ctx.func("asin", f64::asin);
+            ctx.func("acos", f64::acos);
+            ctx.func("atan", f64::atan);
+            ctx.func("sinh", f64::sinh);
+            ctx.func("cosh", f64::cosh);
+            ctx.func("tanh", f64::tanh);
+            ctx.func("asinh", f64::asinh);
+            ctx.func("acosh", f64::acosh);
+            ctx.func("atanh", f64::atanh);
+            ctx.func("floor", f64::floor);
+            ctx.func("ceil", f64::ceil);
+            ctx.func("round", f64::round);
+            ctx.func("signum", f64::signum);
+            ctx.func2("atan2", f64::atan2);
+            ctx.funcn("max", max_array, 1..);
+            ctx.funcn("min", min_array, 1..);
+            ctx
+        });
+
+        DEFAULT_CONTEXT.with(|ctx| ctx.clone())
     }
 
     /// Creates an empty contexts.
