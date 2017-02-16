@@ -1,6 +1,8 @@
 use std::ops::Deref;
 use std::f64::consts;
 use fnv::FnvHashMap;
+use std::str::FromStr;
+use std::rc::Rc;
 
 type ContextHashMap<K, V> = FnvHashMap<K, V>;
 
@@ -12,8 +14,8 @@ use std;
 
 /// Representation of a parsed expression.
 ///
-/// The expression is internally stored in [reverse Polish notation (RPN)][RPN] as a sequence of
-/// `Token`s.
+/// The expression is internally stored in the [reverse Polish notation (RPN)][RPN] as a sequence
+/// of `Token`s.
 ///
 /// Methods `bind`, `bind_with_context`, `bind2`, ... can be used to create (boxed) closures from
 /// the expression that then can be passed around and used as any other `Fn` closures.  A boxed
@@ -22,28 +24,26 @@ use std;
 /// function argument where a closure is expected, it has to be manually dereferenced:
 ///
 /// ```rust
-/// let func = meval::Expr::from_str("x").unwrap().bind("x").unwrap();
+/// let func = "x^2".parse::<meval::Expr>().unwrap().bind("x").unwrap();
 /// let r = Some(2.).map(&*func);
+/// assert_eq!(r, Some(4.));
 /// ```
 ///
 /// [RPN]: https://en.wikipedia.org/wiki/Reverse_Polish_notation
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Expr {
     rpn: Vec<Token>,
 }
 
 impl Expr {
-    /// Constructs an expression by parsing a string.
-    pub fn from_str<S: AsRef<str>>(string: S) -> Result<Expr, Error> {
-        let tokens = try!(tokenize(string));
 
-        let rpn = try!(to_rpn(&tokens));
-
-        Ok(Expr { rpn: rpn })
+    /// Evaluates the expression with variables given by the argument.
+    pub fn eval(&self) -> Result<f64, Error> {
+        self.eval_with_context(builtin())
     }
 
     /// Evaluates the expression with variables given by the argument.
-    pub fn eval<C: ContextProvider>(&self, ctx: C) -> Result<f64, Error> {
+    pub fn eval_with_context<C: ContextProvider>(&self, ctx: C) -> Result<f64, Error> {
         use tokenizer::Token::*;
         use tokenizer::Operation::*;
 
@@ -135,7 +135,7 @@ impl Expr {
     {
         try!(self.check_context(((var, 0.), &ctx)));
         let var = var.to_owned();
-        return Ok(Box::new(move |x| self.eval(((&var, x), &ctx)).expect("Expr::bind")));
+        return Ok(Box::new(move |x| self.eval_with_context(((&var, x), &ctx)).expect("Expr::bind")));
     }
 
     /// Creates a function of two variables based on this expression, with default constants and
@@ -170,7 +170,7 @@ impl Expr {
         let var1 = var1.to_owned();
         let var2 = var2.to_owned();
         return Ok(Box::new(move |x, y| {
-            self.eval(([(&var1, x), (&var2, y)], &ctx)).expect("Expr::bind2")
+            self.eval_with_context(([(&var1, x), (&var2, y)], &ctx)).expect("Expr::bind2")
         }));
     }
 
@@ -212,7 +212,7 @@ impl Expr {
         let var2 = var2.to_owned();
         let var3 = var3.to_owned();
         return Ok(Box::new(move |x, y, z| {
-            self.eval(([(&var1, x), (&var2, y), (&var3, z)], &ctx)).expect("Expr::bind3")
+            self.eval_with_context(([(&var1, x), (&var2, y), (&var3, z)], &ctx)).expect("Expr::bind3")
         }));
     }
 
@@ -248,9 +248,21 @@ impl Expr {
 
 /// Evaluates a string with built-in constants and functions.
 pub fn eval_str<S: AsRef<str>>(expr: S) -> Result<f64, Error> {
-    let expr = try!(Expr::from_str(expr));
+    let expr = try!(Expr::from_str(expr.as_ref()));
 
-    expr.eval(builtin())
+    expr.eval_with_context(builtin())
+}
+
+impl FromStr for Expr {
+    type Err = Error;
+    /// Constructs an expression by parsing a string.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let tokens = try!(tokenize(s));
+
+        let rpn = try!(to_rpn(&tokens));
+
+        Ok(Expr { rpn: rpn })
+    }
 }
 
 /// Evaluates a string with the given context.
@@ -259,9 +271,9 @@ pub fn eval_str<S: AsRef<str>>(expr: S) -> Result<f64, Error> {
 pub fn eval_str_with_context<S: AsRef<str>, C: ContextProvider>(expr: S,
                                                                 ctx: C)
                                                                 -> Result<f64, Error> {
-    let expr = try!(Expr::from_str(expr));
+    let expr = try!(Expr::from_str(expr.as_ref()));
 
-    expr.eval(ctx)
+    expr.eval_with_context(ctx)
 }
 
 impl Deref for Expr {
@@ -483,6 +495,7 @@ array_impls! {
 /// assert_eq!(eval_str_with_context("pi + sum(1., 2.) + f(x)", &ctx),
 ///            Ok(std::f64::consts::PI + 1. + 2. + 2. * 3.));
 /// ```
+#[derive(Clone)]
 pub struct Context<'a> {
     vars: ContextHashMap<String, f64>,
     funcs: ContextHashMap<String, GuardedFunc<'a>>,
@@ -491,34 +504,38 @@ pub struct Context<'a> {
 impl<'a> Context<'a> {
     /// Creates a context with built-in constants and functions.
     pub fn new() -> Context<'a> {
-        let mut ctx = Context::empty();
-        ctx.var("pi", consts::PI);
-        ctx.var("e", consts::E);
+        thread_local!(static DEFAULT_CONTEXT: Context<'static> = {
+            let mut ctx = Context::empty();
+            ctx.var("pi", consts::PI);
+            ctx.var("e", consts::E);
 
-        ctx.func("sqrt", f64::sqrt);
-        ctx.func("exp", f64::exp);
-        ctx.func("ln", f64::ln);
-        ctx.func("abs", f64::abs);
-        ctx.func("sin", f64::sin);
-        ctx.func("cos", f64::cos);
-        ctx.func("tan", f64::tan);
-        ctx.func("asin", f64::asin);
-        ctx.func("acos", f64::acos);
-        ctx.func("atan", f64::atan);
-        ctx.func("sinh", f64::sinh);
-        ctx.func("cosh", f64::cosh);
-        ctx.func("tanh", f64::tanh);
-        ctx.func("asinh", f64::asinh);
-        ctx.func("acosh", f64::acosh);
-        ctx.func("atanh", f64::atanh);
-        ctx.func("floor", f64::floor);
-        ctx.func("ceil", f64::ceil);
-        ctx.func("round", f64::round);
-        ctx.func("signum", f64::signum);
-        ctx.func2("atan2", f64::atan2);
-        ctx.funcn("max", max_array, 1..);
-        ctx.funcn("min", min_array, 1..);
-        ctx
+            ctx.func("sqrt", f64::sqrt);
+            ctx.func("exp", f64::exp);
+            ctx.func("ln", f64::ln);
+            ctx.func("abs", f64::abs);
+            ctx.func("sin", f64::sin);
+            ctx.func("cos", f64::cos);
+            ctx.func("tan", f64::tan);
+            ctx.func("asin", f64::asin);
+            ctx.func("acos", f64::acos);
+            ctx.func("atan", f64::atan);
+            ctx.func("sinh", f64::sinh);
+            ctx.func("cosh", f64::cosh);
+            ctx.func("tanh", f64::tanh);
+            ctx.func("asinh", f64::asinh);
+            ctx.func("acosh", f64::acosh);
+            ctx.func("atanh", f64::atanh);
+            ctx.func("floor", f64::floor);
+            ctx.func("ceil", f64::ceil);
+            ctx.func("round", f64::round);
+            ctx.func("signum", f64::signum);
+            ctx.func2("atan2", f64::atan2);
+            ctx.funcn("max", max_array, 1..);
+            ctx.funcn("min", min_array, 1..);
+            ctx
+        });
+
+        DEFAULT_CONTEXT.with(|ctx| ctx.clone())
     }
 
     /// Creates an empty contexts.
@@ -542,7 +559,7 @@ impl<'a> Context<'a> {
     {
 
         self.funcs.insert(name.into(),
-                          Box::new(move |args: &[f64]| {
+                          Rc::new(move |args: &[f64]| {
             if args.len() == 1 {
                 Ok(func(args[0]))
             } else {
@@ -558,7 +575,7 @@ impl<'a> Context<'a> {
               F: Fn(f64, f64) -> f64 + 'a
     {
         self.funcs.insert(name.into(),
-                          Box::new(move |args: &[f64]| {
+                          Rc::new(move |args: &[f64]| {
             if args.len() == 2 {
                 Ok(func(args[0], args[1]))
             } else {
@@ -574,7 +591,7 @@ impl<'a> Context<'a> {
               F: Fn(f64, f64, f64) -> f64 + 'a
     {
         self.funcs.insert(name.into(),
-                          Box::new(move |args: &[f64]| {
+                          Rc::new(move |args: &[f64]| {
             if args.len() == 3 {
                 Ok(func(args[0], args[1], args[2]))
             } else {
@@ -611,7 +628,7 @@ impl<'a> Context<'a> {
     }
 }
 
-type GuardedFunc<'a> = Box<Fn(&[f64]) -> Result<f64, FuncEvalError> + 'a>;
+type GuardedFunc<'a> = Rc<Fn(&[f64]) -> Result<f64, FuncEvalError> + 'a>;
 
 /// Trait for types that can specify the number of required arguments for a function with a
 /// variable number of arguments.
@@ -633,7 +650,7 @@ pub trait ArgGuard {
 
 impl ArgGuard for usize {
     fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a> {
-        Box::new(move |args: &[f64]| {
+        Rc::new(move |args: &[f64]| {
             if args.len() == self {
                 Ok(func(args))
             } else {
@@ -645,7 +662,7 @@ impl ArgGuard for usize {
 
 impl ArgGuard for std::ops::RangeFrom<usize> {
     fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a> {
-        Box::new(move |args: &[f64]| {
+        Rc::new(move |args: &[f64]| {
             if args.len() >= self.start {
                 Ok(func(args))
             } else {
@@ -657,7 +674,7 @@ impl ArgGuard for std::ops::RangeFrom<usize> {
 
 impl ArgGuard for std::ops::RangeTo<usize> {
     fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a> {
-        Box::new(move |args: &[f64]| {
+        Rc::new(move |args: &[f64]| {
             if args.len() < self.end {
                 Ok(func(args))
             } else {
@@ -669,7 +686,7 @@ impl ArgGuard for std::ops::RangeTo<usize> {
 
 impl ArgGuard for std::ops::Range<usize> {
     fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a> {
-        Box::new(move |args: &[f64]| {
+        Rc::new(move |args: &[f64]| {
             if args.len() >= self.start && args.len() < self.end {
                 Ok(func(args))
             } else if args.len() < self.start {
@@ -683,9 +700,7 @@ impl ArgGuard for std::ops::Range<usize> {
 
 impl ArgGuard for std::ops::RangeFull {
     fn to_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a>(self, func: F) -> GuardedFunc<'a> {
-        Box::new(move |args: &[f64]| {
-            Ok(func(args))
-        })
+        Rc::new(move |args: &[f64]| Ok(func(args)))
     }
 }
 
@@ -698,10 +713,82 @@ impl<'a> ContextProvider for Context<'a> {
     }
 }
 
+#[cfg(feature = "serde")]
+pub mod de {
+    use serde;
+    use super::Expr;
+    use std::fmt;
+    use tokenizer::Token;
+    use std::str::FromStr;
+
+    impl serde::Deserialize for Expr {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where D: serde::Deserializer
+        {
+            struct ExprVisitor;
+
+            impl serde::de::Visitor for ExprVisitor {
+                type Value = Expr;
+
+                fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                    formatter.write_str("a math expression")
+                }
+
+                fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                    where E: serde::de::Error
+                {
+                    Expr::from_str(v).map_err(serde::de::Error::custom)
+                }
+
+                fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+                    where E: serde::de::Error
+                {
+                    Ok(Expr { rpn: vec![Token::Number(v)] })
+                }
+
+                fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+                    where E: serde::de::Error
+                {
+                    Ok(Expr { rpn: vec![Token::Number(v as f64)] })
+                }
+
+                fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+                    where E: serde::de::Error
+                {
+                    Ok(Expr { rpn: vec![Token::Number(v as f64)] })
+                }
+            }
+
+            deserializer.deserialize_str(ExprVisitor)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use serde_test;
+        #[test]
+        fn test_deserialization() {
+            use serde_test::Token;
+            let expr = Expr::from_str("sin(x)").unwrap();
+
+            serde_test::assert_de_tokens(&expr, &[Token::Str("sin(x)")]);
+            serde_test::assert_de_tokens(&expr, &[Token::String(String::from("sin(x)"))]);
+
+            let expr = Expr::from_str("5").unwrap();
+
+            serde_test::assert_de_tokens(&expr, &[Token::F64(5.)]);
+            serde_test::assert_de_tokens(&expr, &[Token::U8(5)]);
+            serde_test::assert_de_tokens(&expr, &[Token::I8(5)]);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use Error;
+    use std::str::FromStr;
 
     #[test]
     fn test_eval() {
