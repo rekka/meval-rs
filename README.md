@@ -25,7 +25,7 @@ Simply add the corresponding entry to your `Cargo.toml` dependency list:
 
 ```toml
 [dependencies]
-meval = "0.0.7"
+meval = "0.0.8"
 ```
 
 and add this to your crate root:
