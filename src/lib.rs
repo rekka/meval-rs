@@ -136,7 +136,7 @@
 //! # Deserialization
 //!
 //! [`Expr`][Expr] supports deserialization using the [serde] library to make flexible
-//! configuration easy to set up.
+//! configuration easy to set up, if the feature `serde` is enabled (default).
 //!
 //! ```rust
 //! #[macro_use]
@@ -197,6 +197,8 @@ use std::fmt;
 pub mod tokenizer;
 pub mod shunting_yard;
 mod expr;
+
+#[cfg(feature = "serde")]
 pub mod de;
 
 pub use expr::*;

@@ -9,7 +9,7 @@ name = "meval"
 readme = "README.md"
 repository = "https://github.com/rekka/meval-rs"
 version = "0.0.8"
-exclude = ["README.tpl"]
+exclude = ["README.tpl", ".travis.yml"]
 
 [dependencies]
 fnv = "1.0.5"
