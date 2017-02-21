@@ -15,7 +15,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! meval = "0.0.8"
+//! meval = "0.0.9"
 //! ```
 //!
 //! and add this to your crate root:

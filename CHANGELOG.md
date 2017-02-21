@@ -1,3 +1,7 @@
+# 0.0.9
+
+- Bug #13: failed build with `serde` feature disabled
+
 # 0.0.8
 
 - added serde deserialization
