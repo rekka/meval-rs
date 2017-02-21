@@ -18,6 +18,7 @@ script:
   travis-cargo test &&
   travis-cargo bench &&
   travis-cargo --only stable doc
+- cargo build --no-default-features --verbose
 after_success:
 - travis-cargo --only stable doc-upload
 env:
