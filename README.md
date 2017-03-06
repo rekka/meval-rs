@@ -182,9 +182,12 @@ fn main() {
 ## Related projects
 
 This is a toy project of mine for learning Rust, and to be hopefully useful when writing
-command line scripts. For other similar projects see:
+command line scripts. There is no plan to make this anything more than _math expression ->
+number_ "converter". For more advanced scripting, see:
 
-- [rodolf0/tox](https://github.com/rodolf0/tox)
+- [dyon] -- A rusty dynamically typed scripting language
+- [gluon] -- A static, type inferred programming language for application embedding
+- [rodolf0/tox](https://github.com/rodolf0/tox) -- another shunting yard expression parser
 
 [Rust]: https://www.rust-lang.org/
 [std-float]: http://doc.rust-lang.org/stable/std/primitive.f64.html
@@ -193,6 +196,8 @@ command line scripts. For other similar projects see:
 [Expr::bind]: struct.Expr.html#method.bind
 [Context]: struct.Context.html
 [serde]: https://crates.io/crates/serde
+[dyon]: https://crates.io/crates/dyon
+[gluon]: https://crates.io/crates/gluon
 
 ## License
 
