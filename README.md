@@ -2,9 +2,9 @@
 [![](http://meritbadge.herokuapp.com/meval)](https://crates.io/crates/meval)
 [![meval at docs.rs](https://docs.rs/meval/badge.svg)](https://docs.rs/meval)
 
-[Expr]: http://rekka.github.io/meval-rs/meval/struct.Expr.html
-[Expr::bind]: http://rekka.github.io/meval-rs/meval/struct.Expr.html#method.bind
-[Context]: http://rekka.github.io/meval-rs/meval/trait.Context.html
+[Expr]: https://docs.rs/meval/0.1.0/meval/struct.Expr.html
+[Expr::bind]: https://docs.rs/meval/0.1.0/meval/struct.Expr.html#method.bind
+[Context]: https://docs.rs/meval/0.1.0/meval/trait.Context.html
 
 # meval
 
@@ -15,9 +15,7 @@ Rust, think initial data and boundary conditions, via config files or command li
 
 ## Documentation
 
-- [Full API documentation (crates.io)](https://docs.rs/meval)
-
-- [Full API documentation (master)](http://rekka.github.io/meval-rs/meval/index.html)
+- [Full API documentation](https://docs.rs/meval)
 
 ## Installation
 
@@ -205,7 +203,3 @@ number_ "converter". For more advanced scripting, see:
 This project is dual-licensed under the Unlicense and MIT licenses.
 
 You may use this code under the terms of either license.
-
-[Expr]: http://rekka.github.io/meval-rs/meval/struct.Expr.html
-[Expr::bind]: http://rekka.github.io/meval-rs/meval/struct.Expr.html#method.bind
-[Context]: http://rekka.github.io/meval-rs/meval/trait.Context.html
