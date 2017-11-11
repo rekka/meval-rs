@@ -2,10 +2,6 @@
 [![](http://meritbadge.herokuapp.com/meval)](https://crates.io/crates/meval)
 [![meval at docs.rs](https://docs.rs/meval/badge.svg)](https://docs.rs/meval)
 
-[Expr]: https://docs.rs/meval/0.1.0/meval/struct.Expr.html
-[Expr::bind]: https://docs.rs/meval/0.1.0/meval/struct.Expr.html#method.bind
-[Context]: https://docs.rs/meval/0.1.0/meval/trait.Context.html
-
 # meval
 
 This [Rust] crate provides a simple math expression parsing and evaluation. Its main goal is to
@@ -44,7 +40,7 @@ fn main() {
 }
 ```
 
-Need to define a Rust function from an expression? No problem, use [`Expr`][Expr]
+Need to define a Rust function from an expression? No problem, use `Expr`
 for this and more:
 
 ```rust
@@ -60,7 +56,7 @@ fn main() {
 }
 ```
 
-[`Expr::bind`][Expr::bind] returns a boxed closure that is slightly less
+`Expr::bind` returns a boxed closure that is slightly less
 convenient than an unboxed closure since `Box<Fn(f64) -> f64>` does not implement `FnOnce`,
 `Fn` or `FnMut`. So to use it directly as a function argument where a closure is expected, it
 has to be manually dereferenced:
@@ -70,7 +66,7 @@ let func = "x".parse::<meval::Expr>().unwrap().bind("x").unwrap();
 let r = Some(2.).map(&*func);
 ```
 
-Custom constants and functions? Define a [`Context`][Context]!
+Custom constants and functions? Define a `Context`!
 
 ```rust
 use meval::{Expr, Context};
@@ -89,7 +85,7 @@ assert_eq!(func(2.), -2. * -1. + 2. + 1.);
 
 For functions of 2, 3, and N variables use `Context::func2`, `Context::func3` and
 `Context::funcn`,
-respectively. See [`Context`][Context] for more options.
+respectively. See `Context` for more options.
 
 If you need a custom function depending on mutable parameters, you will need to use a
 [`Cell`](https://doc.rust-lang.org/stable/std/cell/struct.Cell.html):
@@ -143,7 +139,7 @@ supported:
 
 ## Deserialization
 
-[`Expr`][Expr] supports deserialization using the [serde] library to make flexible
+`Expr` supports deserialization using the [serde] library to make flexible
 configuration easy to set up, if the feature `serde` is enabled
 (disabled by default).
 
@@ -191,9 +187,6 @@ number_ "converter". For more advanced scripting, see:
 [Rust]: https://www.rust-lang.org/
 [std-float]: http://doc.rust-lang.org/stable/std/primitive.f64.html
 
-[Expr]: struct.Expr.html
-[Expr::bind]: struct.Expr.html#method.bind
-[Context]: struct.Context.html
 [serde]: https://crates.io/crates/serde
 [dyon]: https://crates.io/crates/dyon
 [gluon]: https://crates.io/crates/gluon
