@@ -8,20 +8,22 @@ license = "Unlicense/MIT"
 name = "meval"
 readme = "README.md"
 repository = "https://github.com/rekka/meval-rs"
-version = "0.0.9"
+version = "0.1.0"
 exclude = ["README.tpl", ".travis.yml"]
 
 [dependencies]
 fnv = "1.0.5"
 nom = "1.0.0"
-serde = { version = "0.9", optional = true }
+serde = { version = "1", optional = true }
 
 [dev-dependencies]
-gnuplot = "0.0.18"
-serde_test = "0.9"
-serde_derive = "0.9"
-toml = "0.3"
+gnuplot = "0.0.23"
+serde_test = "1"
+serde_derive = "1"
+toml = "0.4.5"
 
 [features]
-default = ["serde"]
+default = []
 
+[package.metadata.docs.rs]
+features = [ "serde" ]

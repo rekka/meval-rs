@@ -25,7 +25,7 @@ Simply add the corresponding entry to your `Cargo.toml` dependency list:
 
 ```toml
 [dependencies]
-meval = "0.0.9"
+meval = "0.1"
 ```
 
 and add this to your crate root:
@@ -146,7 +146,8 @@ supported:
 ## Deserialization
 
 [`Expr`][Expr] supports deserialization using the [serde] library to make flexible
-configuration easy to set up, if the feature `serde` is enabled (default).
+configuration easy to set up, if the feature `serde` is enabled
+(disabled by default).
 
 ```rust
 #[macro_use]

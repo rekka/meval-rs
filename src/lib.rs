@@ -15,7 +15,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! meval = "0.0.9"
+//! meval = "0.1"
 //! ```
 //!
 //! and add this to your crate root:
@@ -136,9 +136,10 @@
 //! # Deserialization
 //!
 //! [`Expr`][Expr] supports deserialization using the [serde] library to make flexible
-//! configuration easy to set up, if the feature `serde` is enabled (default).
+//! configuration easy to set up, if the feature `serde` is enabled (disable by default).
 //!
-//! ```rust
+#![cfg_attr(feature = "serde", doc = " ```rust")]
+#![cfg_attr(not(feature = "serde"), doc = " ```rust,ignore")]
 //! #[macro_use]
 //! extern crate serde_derive;
 //! extern crate toml;
