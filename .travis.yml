@@ -7,21 +7,8 @@ matrix:
   allow_failures:
   - rust: nightly
 sudo: false
-before_script:
-- |
-  pip install 'travis-cargo<0.2' --user &&
-  export PATH=$HOME/.local/bin:$PATH
-- echo $TRAVIS_RUST_VERSION
 script:
-- |
-  travis-cargo build &&
-  travis-cargo test &&
-  travis-cargo bench &&
-  travis-cargo --only stable doc
-- cargo build --no-default-features --verbose
-after_success:
-- travis-cargo --only stable doc-upload
-env:
-  global:
-  - TRAVIS_CARGO_NIGHTLY_FEATURE=""
-  - secure: zXFmxlvaYWlZdpo4gpPqBC6z8+32NRpCEyuAmRioSWqEJIj/hcN/3+jvvj27/5JOz1+geqnVVqhpNxU0HbiCYU1GO8BYOHOb7lW9uLZ4rYEk9o2dCmIXrf66SdqmfDYScPsSD3SPqZNtjzEODCkW2GWl8ciy6FhBJVEWBw22iaPIXp+AojexyUcjEeVrgP4gm3ZTtr0rVn/4grXrmDuoS8mupFzlJXfpJw23fHYoKhvzQmo6kEKcaqCvtdzeqUOQvXsxGsBZqlZLzzSeK2EFUhGjVlmWSqrdeAFc5FIEYEISgwokYrhKWw/nDCrlS2WwWpHAAbMyUV0Y0EHGV9i6fA/tJbYaXUViej+VGmkka26STHpYVPgwmxTqJ2xhWJMUIljjOROHSyYf66mgEiZpsCAbo6YVAF9IBdYheC5XiMadF2IdSwyuzlkSVesqmkvRNWycEytnZUYul8ramZ2extn75P04ZmCPCUu1iAjgpnsb5X5AGwHHNLxy5OYEaRn/dtsqJyEe6pwTgicQqn8byLgNmXebAreImKA841wjcgxTRrDGcyS3p6zBTG9WnIBJaIQRr06af0ZHqLcJ5+Bv8diWU/6BVHgdAHQVWotqWi/3nk8au2i3Oh9I/T6LgcUvFCkCpHHFc+DCmSbb8o5otImkI/JXb/8wWkAUtsos9Hw=
+  - cargo build --verbose
+  - cargo test --verbose
+  - cargo build --all-features --verbose
+  - cargo test --all-features --verbose
