@@ -721,13 +721,13 @@ pub mod de {
     use tokenizer::Token;
     use std::str::FromStr;
 
-    impl serde::Deserialize for Expr {
+    impl<'de> serde::Deserialize<'de> for Expr {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where D: serde::Deserializer
+            where D: serde::Deserializer<'de>
         {
             struct ExprVisitor;
 
-            impl serde::de::Visitor for ExprVisitor {
+            impl<'de> serde::de::Visitor<'de> for ExprVisitor {
                 type Value = Expr;
 
                 fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -773,7 +773,7 @@ pub mod de {
             let expr = Expr::from_str("sin(x)").unwrap();
 
             serde_test::assert_de_tokens(&expr, &[Token::Str("sin(x)")]);
-            serde_test::assert_de_tokens(&expr, &[Token::String(String::from("sin(x)"))]);
+            serde_test::assert_de_tokens(&expr, &[Token::String("sin(x)")]);
 
             let expr = Expr::from_str("5").unwrap();
 

@@ -40,7 +40,7 @@ fn main() {
                 }
             };
 
-            axes.lines(&xi, xi.iter().map(|&x| func(x)), &[Caption(&arg)]);
+            axes.lines(&xi, xi.iter().map(|&x| func(x)), &[Caption("plot" /* &arg */)]);
         }
     }
     fg.show();
