@@ -25,3 +25,5 @@ toml = "0.4.5"
 [features]
 default = []
 
+[package.metadata.docs.rs]
+features = [ "serde" ]
