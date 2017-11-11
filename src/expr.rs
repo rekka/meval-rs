@@ -116,7 +116,7 @@ impl Expr {
     /// Returns `Err` if there is a variable in the expression that is not provided by the default
     /// context or `var`.
     pub fn bind<'a>(self, var: &str) -> Result<Box<Fn(f64) -> f64 + 'a>, Error> {
-        return self.bind_with_context(builtin(), var);
+        self.bind_with_context(builtin(), var)
     }
 
     /// Creates a function of one variable based on this expression.
@@ -135,7 +135,7 @@ impl Expr {
     {
         try!(self.check_context(((var, 0.), &ctx)));
         let var = var.to_owned();
-        return Ok(Box::new(move |x| self.eval_with_context(((&var, x), &ctx)).expect("Expr::bind")));
+        Ok(Box::new(move |x| self.eval_with_context(((&var, x), &ctx)).expect("Expr::bind")))
     }
 
     /// Creates a function of two variables based on this expression, with default constants and
@@ -148,7 +148,7 @@ impl Expr {
     /// Returns `Err` if there is a variable in the expression that is not provided by the default
     /// context or `var`.
     pub fn bind2<'a>(self, var1: &str, var2: &str) -> Result<Box<Fn(f64, f64) -> f64 + 'a>, Error> {
-        return self.bind2_with_context(builtin(), var1, var2);
+        self.bind2_with_context(builtin(), var1, var2)
     }
 
     /// Creates a function of two variables based on this expression.
@@ -169,9 +169,9 @@ impl Expr {
         try!(self.check_context(([(var1, 0.), (var2, 0.)], &ctx)));
         let var1 = var1.to_owned();
         let var2 = var2.to_owned();
-        return Ok(Box::new(move |x, y| {
+        Ok(Box::new(move |x, y| {
             self.eval_with_context(([(&var1, x), (&var2, y)], &ctx)).expect("Expr::bind2")
-        }));
+        }))
     }
 
     /// Creates a function of three variables based on this expression, with default constants and
@@ -188,7 +188,7 @@ impl Expr {
                      var2: &str,
                      var3: &str)
                      -> Result<Box<Fn(f64, f64, f64) -> f64 + 'a>, Error> {
-        return self.bind3_with_context(builtin(), var1, var2, var3);
+        self.bind3_with_context(builtin(), var1, var2, var3)
     }
 
     /// Creates a function of three variables based on this expression.
@@ -211,9 +211,9 @@ impl Expr {
         let var1 = var1.to_owned();
         let var2 = var2.to_owned();
         let var3 = var3.to_owned();
-        return Ok(Box::new(move |x, y, z| {
+        Ok(Box::new(move |x, y, z| {
             self.eval_with_context(([(&var1, x), (&var2, y), (&var3, z)], &ctx)).expect("Expr::bind3")
-        }));
+        }))
     }
 
     /// Checks that the value of every variable in the expression is specified by the context `ctx`.
@@ -222,7 +222,7 @@ impl Expr {
     ///
     /// Returns `Err` if a missing variable is detected.
     fn check_context<C: ContextProvider>(&self, ctx: C) -> Result<(), Error> {
-        for t in self.rpn.iter() {
+        for t in &self.rpn {
             match *t {
                 Token::Var(ref name) => {
                     if ctx.get_var(name).is_none() {
@@ -625,6 +625,12 @@ impl<'a> Context<'a> {
     {
         self.funcs.insert(name.into(), n_args.to_arg_guard(func));
         self
+    }
+}
+
+impl<'a> Default for Context<'a> {
+    fn default() -> Self {
+        Context::new()
     }
 }
 

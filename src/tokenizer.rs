@@ -175,8 +175,7 @@ named!(float<usize>, chain!(
 fn exp(input: &[u8]) -> IResult<&[u8], Option<usize>> {
     use nom::IResult::*;
     match alt!(input, tag!("e") | tag!("E")) {
-        Incomplete(_) => Done(input, None),
-        Error(_) => Done(input, None),
+        Incomplete(_) | Error(_) => Done(input, None),
         Done(i, _) => {
             match chain!(i, s: alt!(tag!("+") | tag!("-"))? ~
                    e: digit_complete,

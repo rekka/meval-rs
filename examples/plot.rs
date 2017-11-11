@@ -5,7 +5,7 @@ use std::env::args;
 use gnuplot::{Figure, Caption};
 use meval::Expr;
 
-const USAGE: &'static str = r"Plot functions of variable `x`.
+const USAGE: &str = r"Plot functions of variable `x`.
 
 Usage: plot EXPR1 EXPR2 ...
 
@@ -21,7 +21,7 @@ fn main() {
     fg.clear_axes();
 
     {
-        let mut axes = fg.axes2d();
+        let axes = fg.axes2d();
 
         let n = 100;
         let xi: Vec<_> = (0..n + 1).map(|i| i as f64 / n as f64).collect();

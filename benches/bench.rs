@@ -12,7 +12,7 @@ use meval::max_array;
 use meval::ContextProvider;
 use std::f64::consts;
 
-const EXPR: &'static str = "abs(sin(x + 1) * (x^2 + x + 1))";
+const EXPR: &str = "abs(sin(x + 1) * (x^2 + x + 1))";
 
 #[bench]
 fn parsing(b: &mut Bencher) {

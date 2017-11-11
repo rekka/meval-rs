@@ -3,7 +3,7 @@ extern crate meval;
 use std::env::args;
 use meval::eval_str;
 
-const USAGE: &'static str = r"Simple math expression evaluation.
+const USAGE: &str = r"Simple math expression evaluation.
 
 Usage: eval EXPR1 EXPR2 ...";
 
