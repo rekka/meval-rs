@@ -1,3 +1,11 @@
+# 0.1.1
+
+- Implement `Default` for `Context`
+
+# 0.1.0
+
+- Support `serde-1.0.0`
+
 # 0.0.9
 
 - Bug #13: failed build with `serde` feature disabled
