@@ -765,7 +765,7 @@ pub mod de {
                 }
             }
 
-            deserializer.deserialize_str(ExprVisitor)
+            deserializer.deserialize_f64(ExprVisitor)
         }
     }
 
