@@ -1,16 +1,16 @@
-use std::ops::Deref;
-use std::f64::consts;
 use fnv::FnvHashMap;
-use std::str::FromStr;
+use std::f64::consts;
+use std::ops::Deref;
 use std::rc::Rc;
+use std::str::FromStr;
 
 type ContextHashMap<K, V> = FnvHashMap<K, V>;
 
-use Error;
-use tokenizer::{Token, tokenize};
 use shunting_yard::to_rpn;
-use std::fmt;
 use std;
+use std::fmt;
+use tokenizer::{tokenize, Token};
+use Error;
 
 /// Representation of a parsed expression.
 ///
@@ -33,7 +33,6 @@ pub struct Expr {
 }
 
 impl Expr {
-
     /// Evaluates the expression.
     pub fn eval(&self) -> Result<f64, Error> {
         self.eval_with_context(builtin())
@@ -41,8 +40,8 @@ impl Expr {
 
     /// Evaluates the expression with variables given by the argument.
     pub fn eval_with_context<C: ContextProvider>(&self, ctx: C) -> Result<f64, Error> {
-        use tokenizer::Token::*;
         use tokenizer::Operation::*;
+        use tokenizer::Token::*;
 
         let mut stack = Vec::with_capacity(16);
 
@@ -79,9 +78,11 @@ impl Expr {
                 }
                 Func(ref n, Some(i)) => {
                     if stack.len() < i {
-                        panic!("eval: stack does not have enough arguments for function token \
-                                {:?}",
-                               token);
+                        panic!(
+                            "eval: stack does not have enough arguments for function token \
+                             {:?}",
+                            token
+                        );
                     }
                     match ctx.eval_func(n, &stack[stack.len() - i..]) {
                         Ok(r) => {
@@ -124,15 +125,20 @@ impl Expr {
     ///
     /// Returns `Err` if there is a variable in the expression that is not provided by `ctx` or
     /// `var`.
-    pub fn bind_with_context<'a, C>(self,
-                                    ctx: C,
-                                    var: &str)
-                                    -> Result<impl Fn(f64) -> f64 + 'a, Error>
-        where C: ContextProvider + 'a
+    pub fn bind_with_context<'a, C>(
+        self,
+        ctx: C,
+        var: &str,
+    ) -> Result<impl Fn(f64) -> f64 + 'a, Error>
+    where
+        C: ContextProvider + 'a,
     {
         try!(self.check_context(((var, 0.), &ctx)));
         let var = var.to_owned();
-        Ok(move |x| self.eval_with_context(((&var, x), &ctx)).expect("Expr::bind"))
+        Ok(move |x| {
+            self.eval_with_context(((&var, x), &ctx))
+                .expect("Expr::bind")
+        })
     }
 
     /// Creates a function of two variables based on this expression, with default constants and
@@ -156,18 +162,21 @@ impl Expr {
     ///
     /// Returns `Err` if there is a variable in the expression that is not provided by `ctx` or
     /// `var`.
-    pub fn bind2_with_context<'a, C>(self,
-                                     ctx: C,
-                                     var1: &str,
-                                     var2: &str)
-                                     -> Result<impl Fn(f64, f64) -> f64 + 'a, Error>
-        where C: ContextProvider + 'a
+    pub fn bind2_with_context<'a, C>(
+        self,
+        ctx: C,
+        var1: &str,
+        var2: &str,
+    ) -> Result<impl Fn(f64, f64) -> f64 + 'a, Error>
+    where
+        C: ContextProvider + 'a,
     {
         try!(self.check_context(([(var1, 0.), (var2, 0.)], &ctx)));
         let var1 = var1.to_owned();
         let var2 = var2.to_owned();
         Ok(move |x, y| {
-            self.eval_with_context(([(&var1, x), (&var2, y)], &ctx)).expect("Expr::bind2")
+            self.eval_with_context(([(&var1, x), (&var2, y)], &ctx))
+                .expect("Expr::bind2")
         })
     }
 
@@ -180,11 +189,12 @@ impl Expr {
     ///
     /// Returns `Err` if there is a variable in the expression that is not provided by the default
     /// context or `var`.
-    pub fn bind3<'a>(self,
-                     var1: &str,
-                     var2: &str,
-                     var3: &str)
-                     -> Result<impl Fn(f64, f64, f64) -> f64 + 'a, Error> {
+    pub fn bind3<'a>(
+        self,
+        var1: &str,
+        var2: &str,
+        var3: &str,
+    ) -> Result<impl Fn(f64, f64, f64) -> f64 + 'a, Error> {
         self.bind3_with_context(builtin(), var1, var2, var3)
     }
 
@@ -196,20 +206,23 @@ impl Expr {
     ///
     /// Returns `Err` if there is a variable in the expression that is not provided by `ctx` or
     /// `var`.
-    pub fn bind3_with_context<'a, C>(self,
-                                     ctx: C,
-                                     var1: &str,
-                                     var2: &str,
-                                     var3: &str)
-                                     -> Result<impl Fn(f64, f64, f64) -> f64 + 'a, Error>
-        where C: ContextProvider + 'a
+    pub fn bind3_with_context<'a, C>(
+        self,
+        ctx: C,
+        var1: &str,
+        var2: &str,
+        var3: &str,
+    ) -> Result<impl Fn(f64, f64, f64) -> f64 + 'a, Error>
+    where
+        C: ContextProvider + 'a,
     {
         try!(self.check_context(([(var1, 0.), (var2, 0.), (var3, 0.)], &ctx)));
         let var1 = var1.to_owned();
         let var2 = var2.to_owned();
         let var3 = var3.to_owned();
         Ok(move |x, y, z| {
-            self.eval_with_context(([(&var1, x), (&var2, y), (&var3, z)], &ctx)).expect("Expr::bind3")
+            self.eval_with_context(([(&var1, x), (&var2, y), (&var3, z)], &ctx))
+                .expect("Expr::bind3")
         })
     }
 
@@ -235,8 +248,12 @@ impl Expr {
                 Token::Func(_, None) => {
                     panic!("expr::check_context: Unexpected token: {:?}", *t);
                 }
-                Token::LParen | Token::RParen | Token::Binary(_) | Token::Unary(_) |
-                Token::Comma | Token::Number(_) => {}
+                Token::LParen
+                | Token::RParen
+                | Token::Binary(_)
+                | Token::Unary(_)
+                | Token::Comma
+                | Token::Number(_) => {}
             }
         }
         Ok(())
@@ -265,9 +282,10 @@ impl FromStr for Expr {
 /// Evaluates a string with the given context.
 ///
 /// No built-ins are defined in this case.
-pub fn eval_str_with_context<S: AsRef<str>, C: ContextProvider>(expr: S,
-                                                                ctx: C)
-                                                                -> Result<f64, Error> {
+pub fn eval_str_with_context<S: AsRef<str>, C: ContextProvider>(
+    expr: S,
+    ctx: C,
+) -> Result<f64, Error> {
     let expr = try!(Expr::from_str(expr.as_ref()));
 
     expr.eval_with_context(ctx)
@@ -387,7 +405,6 @@ pub fn min_array(xs: &[f64]) -> f64 {
     xs.iter().fold(::std::f64::INFINITY, |m, &x| m.min(x))
 }
 
-
 /// Returns the built-in constants and functions in a form that can be used as a `ContextProvider`.
 #[doc(hidden)]
 pub fn builtin<'a>() -> Context<'a> {
@@ -439,7 +456,8 @@ impl<S: AsRef<str>> ContextProvider for (S, f64) {
 
 /// `std::collections::HashMap` of variables.
 impl<S> ContextProvider for std::collections::HashMap<S, f64>
-    where S: std::hash::Hash + std::cmp::Eq + std::borrow::Borrow<str>
+where
+    S: std::hash::Hash + std::cmp::Eq + std::borrow::Borrow<str>,
 {
     fn get_var(&self, name: &str) -> Option<f64> {
         self.get(name).cloned()
@@ -448,7 +466,8 @@ impl<S> ContextProvider for std::collections::HashMap<S, f64>
 
 /// `std::collections::BTreeMap` of variables.
 impl<S> ContextProvider for std::collections::BTreeMap<S, f64>
-    where S: std::cmp::Ord + std::borrow::Borrow<str>
+where
+    S: std::cmp::Ord + std::borrow::Borrow<str>,
 {
     fn get_var(&self, name: &str) -> Option<f64> {
         self.get(name).cloned()
@@ -551,50 +570,58 @@ impl<'a> Context<'a> {
 
     /// Adds a new function of one argument.
     pub fn func<S, F>(&mut self, name: S, func: F) -> &mut Self
-        where S: Into<String>,
-              F: Fn(f64) -> f64 + 'a
+    where
+        S: Into<String>,
+        F: Fn(f64) -> f64 + 'a,
     {
-
-        self.funcs.insert(name.into(),
-                          Rc::new(move |args: &[f64]| {
-            if args.len() == 1 {
-                Ok(func(args[0]))
-            } else {
-                Err(FuncEvalError::NumberArgs(1))
-            }
-        }));
+        self.funcs.insert(
+            name.into(),
+            Rc::new(move |args: &[f64]| {
+                if args.len() == 1 {
+                    Ok(func(args[0]))
+                } else {
+                    Err(FuncEvalError::NumberArgs(1))
+                }
+            }),
+        );
         self
     }
 
     /// Adds a new function of two arguments.
     pub fn func2<S, F>(&mut self, name: S, func: F) -> &mut Self
-        where S: Into<String>,
-              F: Fn(f64, f64) -> f64 + 'a
+    where
+        S: Into<String>,
+        F: Fn(f64, f64) -> f64 + 'a,
     {
-        self.funcs.insert(name.into(),
-                          Rc::new(move |args: &[f64]| {
-            if args.len() == 2 {
-                Ok(func(args[0], args[1]))
-            } else {
-                Err(FuncEvalError::NumberArgs(2))
-            }
-        }));
+        self.funcs.insert(
+            name.into(),
+            Rc::new(move |args: &[f64]| {
+                if args.len() == 2 {
+                    Ok(func(args[0], args[1]))
+                } else {
+                    Err(FuncEvalError::NumberArgs(2))
+                }
+            }),
+        );
         self
     }
 
     /// Adds a new function of three arguments.
     pub fn func3<S, F>(&mut self, name: S, func: F) -> &mut Self
-        where S: Into<String>,
-              F: Fn(f64, f64, f64) -> f64 + 'a
+    where
+        S: Into<String>,
+        F: Fn(f64, f64, f64) -> f64 + 'a,
     {
-        self.funcs.insert(name.into(),
-                          Rc::new(move |args: &[f64]| {
-            if args.len() == 3 {
-                Ok(func(args[0], args[1], args[2]))
-            } else {
-                Err(FuncEvalError::NumberArgs(3))
-            }
-        }));
+        self.funcs.insert(
+            name.into(),
+            Rc::new(move |args: &[f64]| {
+                if args.len() == 3 {
+                    Ok(func(args[0], args[1], args[2]))
+                } else {
+                    Err(FuncEvalError::NumberArgs(3))
+                }
+            }),
+        );
         self
     }
 
@@ -616,9 +643,10 @@ impl<'a> Context<'a> {
     /// ctx.funcn("sum", |xs| xs.iter().sum(), ..);
     /// ```
     pub fn funcn<S, F, N>(&mut self, name: S, func: F, n_args: N) -> &mut Self
-        where S: Into<String>,
-              F: Fn(&[f64]) -> f64 + 'a,
-              N: ArgGuard
+    where
+        S: Into<String>,
+        F: Fn(&[f64]) -> f64 + 'a,
+        N: ArgGuard,
     {
         self.funcs.insert(name.into(), n_args.to_arg_guard(func));
         self
@@ -712,21 +740,24 @@ impl<'a> ContextProvider for Context<'a> {
         self.vars.get(name).cloned()
     }
     fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
-        self.funcs.get(name).map_or(Err(FuncEvalError::UnknownFunction), |f| f(args))
+        self.funcs
+            .get(name)
+            .map_or(Err(FuncEvalError::UnknownFunction), |f| f(args))
     }
 }
 
 #[cfg(feature = "serde")]
 pub mod de {
-    use serde;
     use super::Expr;
+    use serde;
     use std::fmt;
-    use tokenizer::Token;
     use std::str::FromStr;
+    use tokenizer::Token;
 
     impl<'de> serde::Deserialize<'de> for Expr {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where D: serde::Deserializer<'de>
+        where
+            D: serde::Deserializer<'de>,
         {
             struct ExprVisitor;
 
@@ -738,27 +769,37 @@ pub mod de {
                 }
 
                 fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-                    where E: serde::de::Error
+                where
+                    E: serde::de::Error,
                 {
                     Expr::from_str(v).map_err(serde::de::Error::custom)
                 }
 
                 fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
-                    where E: serde::de::Error
+                where
+                    E: serde::de::Error,
                 {
-                    Ok(Expr { rpn: vec![Token::Number(v)] })
+                    Ok(Expr {
+                        rpn: vec![Token::Number(v)],
+                    })
                 }
 
                 fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
-                    where E: serde::de::Error
+                where
+                    E: serde::de::Error,
                 {
-                    Ok(Expr { rpn: vec![Token::Number(v as f64)] })
+                    Ok(Expr {
+                        rpn: vec![Token::Number(v as f64)],
+                    })
                 }
 
                 fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
-                    where E: serde::de::Error
+                where
+                    E: serde::de::Error,
                 {
-                    Ok(Expr { rpn: vec![Token::Number(v as f64)] })
+                    Ok(Expr {
+                        rpn: vec![Token::Number(v as f64)],
+                    })
                 }
             }
 
@@ -790,8 +831,8 @@ pub mod de {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use Error;
     use std::str::FromStr;
+    use Error;
 
     #[test]
     fn test_eval() {
@@ -804,8 +845,10 @@ mod tests {
         assert_eq!(eval_str("max(1.)"), Ok(1.));
         assert_eq!(eval_str("max(1., 2., -1)"), Ok(2.));
         assert_eq!(eval_str("min(1., 2., -1)"), Ok(-1.));
-        assert_eq!(eval_str("sin(1.) + cos(2.)"),
-                   Ok((1f64).sin() + (2f64).cos()));
+        assert_eq!(
+            eval_str("sin(1.) + cos(2.)"),
+            Ok((1f64).sin() + (2f64).cos())
+        );
         assert_eq!(eval_str("10 % 9"), Ok(10f64 % 9f64));
     }
 
@@ -816,32 +859,49 @@ mod tests {
 
     #[test]
     fn test_eval_func_ctx() {
-        use std::collections::{HashMap, BTreeMap};
+        use std::collections::{BTreeMap, HashMap};
         let y = 5.;
-        assert_eq!(eval_str_with_context("phi(2.)", Context::new().func("phi", |x| x + y + 3.)),
-                   Ok(2. + y + 3.));
-        assert_eq!(eval_str_with_context("phi(2., 3.)",
-                                         Context::new().func2("phi", |x, y| x + y + 3.)),
-                   Ok(2. + 3. + 3.));
-        assert_eq!(eval_str_with_context("phi(2., 3., 4.)",
-                                         Context::new().func3("phi", |x, y, z| x + y * z)),
-                   Ok(2. + 3. * 4.));
-        assert_eq!(eval_str_with_context("phi(2., 3.)",
-                                         Context::new()
-                                             .funcn("phi", |xs: &[f64]| xs[0] + xs[1], 2)),
-                   Ok(2. + 3.));
+        assert_eq!(
+            eval_str_with_context("phi(2.)", Context::new().func("phi", |x| x + y + 3.)),
+            Ok(2. + y + 3.)
+        );
+        assert_eq!(
+            eval_str_with_context(
+                "phi(2., 3.)",
+                Context::new().func2("phi", |x, y| x + y + 3.)
+            ),
+            Ok(2. + 3. + 3.)
+        );
+        assert_eq!(
+            eval_str_with_context(
+                "phi(2., 3., 4.)",
+                Context::new().func3("phi", |x, y, z| x + y * z)
+            ),
+            Ok(2. + 3. * 4.)
+        );
+        assert_eq!(
+            eval_str_with_context(
+                "phi(2., 3.)",
+                Context::new().funcn("phi", |xs: &[f64]| xs[0] + xs[1], 2)
+            ),
+            Ok(2. + 3.)
+        );
         let mut m = HashMap::new();
         m.insert("x", 2.);
         m.insert("y", 3.);
         assert_eq!(eval_str_with_context("x + y", &m), Ok(2. + 3.));
-        assert_eq!(eval_str_with_context("x + z", m),
-                   Err(Error::UnknownVariable("z".into())));
+        assert_eq!(
+            eval_str_with_context("x + z", m),
+            Err(Error::UnknownVariable("z".into()))
+        );
         let mut m = BTreeMap::new();
         m.insert("x", 2.);
         m.insert("y", 3.);
         assert_eq!(eval_str_with_context("x + y", &m), Ok(2. + 3.));
-        assert_eq!(eval_str_with_context("x + z", m),
-                   Err(Error::UnknownVariable("z".into())));
+        assert_eq!(
+            eval_str_with_context("x + z", m),
+            Err(Error::UnknownVariable("z".into()))
+        );
     }
 
     #[test]
@@ -850,8 +910,10 @@ mod tests {
         let func = expr.clone().bind("x").unwrap();
         assert_eq!(func(1.), 4.);
 
-        assert_eq!(expr.clone().bind("y").err(),
-                   Some(Error::UnknownVariable("x".into())));
+        assert_eq!(
+            expr.clone().bind("y").err(),
+            Some(Error::UnknownVariable("x".into()))
+        );
 
         let ctx = (("x", 2.), builtin());
         let func = expr.bind_with_context(&ctx, "y").unwrap();
@@ -860,10 +922,14 @@ mod tests {
         let expr = Expr::from_str("x + y + 2.").unwrap();
         let func = expr.clone().bind2("x", "y").unwrap();
         assert_eq!(func(1., 2.), 5.);
-        assert_eq!(expr.clone().bind2("z", "y").err(),
-                   Some(Error::UnknownVariable("x".into())));
-        assert_eq!(expr.bind2("x", "z").err(),
-                   Some(Error::UnknownVariable("y".into())));
+        assert_eq!(
+            expr.clone().bind2("z", "y").err(),
+            Some(Error::UnknownVariable("x".into()))
+        );
+        assert_eq!(
+            expr.bind2("x", "z").err(),
+            Some(Error::UnknownVariable("y".into()))
+        );
 
         let expr = Expr::from_str("x + y^2 + z^3").unwrap();
         let func = expr.clone().bind3("x", "y", "z").unwrap();

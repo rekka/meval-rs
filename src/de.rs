@@ -1,8 +1,8 @@
 //! Deserialization utilities.
+use super::Expr;
 use serde::de;
 use serde::de::Error;
 use serde::Deserialize;
-use super::Expr;
 
 /// Deserialize into [`Expr`](../struct.Expr.html) and then evaluate using `Expr::eval`.
 ///
@@ -32,5 +32,7 @@ use super::Expr;
 ///
 /// See [crate root](../index.html#deserialization) for another example.
 pub fn as_f64<'de, D: de::Deserializer<'de>>(deserializer: D) -> Result<f64, D::Error> {
-    Expr::deserialize(deserializer)?.eval().map_err(D::Error::custom)
+    Expr::deserialize(deserializer)?
+        .eval()
+        .map_err(D::Error::custom)
 }

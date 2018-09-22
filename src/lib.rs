@@ -190,9 +190,9 @@ extern crate serde_test;
 
 use std::fmt;
 
-pub mod tokenizer;
-pub mod shunting_yard;
 mod expr;
+pub mod shunting_yard;
+pub mod tokenizer;
 
 #[cfg(feature = "serde")]
 pub mod de;

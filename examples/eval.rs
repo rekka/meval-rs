@@ -1,7 +1,7 @@
 extern crate meval;
 
-use std::env::args;
 use meval::eval_str;
+use std::env::args;
 
 const USAGE: &str = r"Simple math expression evaluation.
 

@@ -1,16 +1,16 @@
 #![feature(test)]
 
-extern crate test;
 extern crate meval;
+extern crate test;
 
-use test::Bencher;
-use meval::Expr;
-use meval::Context;
-use meval::FuncEvalError;
-use meval::min_array;
 use meval::max_array;
+use meval::min_array;
+use meval::Context;
 use meval::ContextProvider;
+use meval::Expr;
+use meval::FuncEvalError;
 use std::f64::consts;
+use test::Bencher;
 
 const EXPR: &str = "abs(sin(x + 1) * (x^2 + x + 1))";
 
@@ -42,9 +42,7 @@ fn evaluation_hashcontext(b: &mut Bencher) {
 #[bench]
 fn default_context(b: &mut Bencher) {
     let expr: Expr = "1 + 2 * 3".parse().unwrap();
-    b.iter(|| {
-        expr.eval()
-    });
+    b.iter(|| expr.eval());
 }
 
 macro_rules! one_arg {
@@ -54,7 +52,7 @@ macro_rules! one_arg {
         } else {
             Err(FuncEvalError::NumberArgs(1))
         }
-    }
+    };
 }
 
 macro_rules! two_args {
@@ -64,7 +62,7 @@ macro_rules! two_args {
         } else {
             Err(FuncEvalError::NumberArgs(2))
         }
-    }
+    };
 }
 
 macro_rules! one_or_more_arg {
@@ -74,7 +72,7 @@ macro_rules! one_or_more_arg {
         } else {
             Err(FuncEvalError::TooFewArguments)
         }
-    }
+    };
 }
 
 /// Built-in functions and constants.

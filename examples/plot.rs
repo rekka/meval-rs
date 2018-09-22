@@ -1,9 +1,9 @@
-extern crate meval;
 extern crate gnuplot;
+extern crate meval;
 
-use std::env::args;
-use gnuplot::{Figure, Caption};
+use gnuplot::{Caption, Figure};
 use meval::Expr;
+use std::env::args;
 
 const USAGE: &str = r"Plot functions of variable `x`.
 
@@ -40,7 +40,11 @@ fn main() {
                 }
             };
 
-            axes.lines(&xi, xi.iter().map(|&x| func(x)), &[Caption("plot" /* &arg */)]);
+            axes.lines(
+                &xi,
+                xi.iter().map(|&x| func(x)),
+                &[Caption("plot" /* &arg */)],
+            );
         }
     }
     fg.show();
