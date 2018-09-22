@@ -22,6 +22,8 @@
 //! extern crate meval;
 //! ```
 //!
+//!  **Requires Rust 1.26.**
+//!
 //! # Simple examples
 //!
 //! ```rust
@@ -48,16 +50,6 @@
 //!
 //!     println!("sin(pi * x), 0 <= x <= 1: {:?}", vs);
 //! }
-//! ```
-//!
-//! [`Expr::bind`][Expr::bind] returns a boxed closure that is slightly less
-//! convenient than an unboxed closure since `Box<Fn(f64) -> f64>` does not implement `FnOnce`,
-//! `Fn` or `FnMut`. So to use it directly as a function argument where a closure is expected, it
-//! has to be manually dereferenced:
-//!
-//! ```rust
-//! let func = "x".parse::<meval::Expr>().unwrap().bind("x").unwrap();
-//! let r = Some(2.).map(&*func);
 //! ```
 //!
 //! Custom constants and functions? Define a [`Context`][Context]!

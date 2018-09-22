@@ -1,3 +1,8 @@
+# Unreleased
+
+- `bind` and `bind_with_context` functions return unboxed closures
+  (requires Rust 1.26).
+
 # 0.1.1
 
 - Implement `Default` for `Context`

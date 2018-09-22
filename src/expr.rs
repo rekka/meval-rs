@@ -17,15 +17,12 @@ use std;
 /// The expression is internally stored in the [reverse Polish notation (RPN)][RPN] as a sequence
 /// of `Token`s.
 ///
-/// Methods `bind`, `bind_with_context`, `bind2`, ... can be used to create (boxed) closures from
-/// the expression that then can be passed around and used as any other `Fn` closures.  A boxed
-/// closure is unfortunately currently slightly less convenient than an unboxed closure since
-/// `Box<Fn(f64) -> f64>` does not implement `FnOnce`, `Fn` or `FnMut`. So to use it directly as a
-/// function argument where a closure is expected, it has to be manually dereferenced:
+/// Methods `bind`, `bind_with_context`, `bind2`, ... can be used to create  closures from
+/// the expression that then can be passed around and used as any other `Fn` closures.
 ///
 /// ```rust
 /// let func = "x^2".parse::<meval::Expr>().unwrap().bind("x").unwrap();
-/// let r = Some(2.).map(&*func);
+/// let r = Some(2.).map(func);
 /// assert_eq!(r, Some(4.));
 /// ```
 ///
@@ -37,7 +34,7 @@ pub struct Expr {
 
 impl Expr {
 
-    /// Evaluates the expression with variables given by the argument.
+    /// Evaluates the expression.
     pub fn eval(&self) -> Result<f64, Error> {
         self.eval_with_context(builtin())
     }
@@ -115,7 +112,7 @@ impl Expr {
     ///
     /// Returns `Err` if there is a variable in the expression that is not provided by the default
     /// context or `var`.
-    pub fn bind<'a>(self, var: &str) -> Result<Box<Fn(f64) -> f64 + 'a>, Error> {
+    pub fn bind<'a>(self, var: &str) -> Result<impl Fn(f64) -> f64 + 'a, Error> {
         self.bind_with_context(builtin(), var)
     }
 
@@ -130,12 +127,12 @@ impl Expr {
     pub fn bind_with_context<'a, C>(self,
                                     ctx: C,
                                     var: &str)
-                                    -> Result<Box<Fn(f64) -> f64 + 'a>, Error>
+                                    -> Result<impl Fn(f64) -> f64 + 'a, Error>
         where C: ContextProvider + 'a
     {
         try!(self.check_context(((var, 0.), &ctx)));
         let var = var.to_owned();
-        Ok(Box::new(move |x| self.eval_with_context(((&var, x), &ctx)).expect("Expr::bind")))
+        Ok(move |x| self.eval_with_context(((&var, x), &ctx)).expect("Expr::bind"))
     }
 
     /// Creates a function of two variables based on this expression, with default constants and
@@ -147,7 +144,7 @@ impl Expr {
     ///
     /// Returns `Err` if there is a variable in the expression that is not provided by the default
     /// context or `var`.
-    pub fn bind2<'a>(self, var1: &str, var2: &str) -> Result<Box<Fn(f64, f64) -> f64 + 'a>, Error> {
+    pub fn bind2<'a>(self, var1: &str, var2: &str) -> Result<impl Fn(f64, f64) -> f64 + 'a, Error> {
         self.bind2_with_context(builtin(), var1, var2)
     }
 
@@ -163,15 +160,15 @@ impl Expr {
                                      ctx: C,
                                      var1: &str,
                                      var2: &str)
-                                     -> Result<Box<Fn(f64, f64) -> f64 + 'a>, Error>
+                                     -> Result<impl Fn(f64, f64) -> f64 + 'a, Error>
         where C: ContextProvider + 'a
     {
         try!(self.check_context(([(var1, 0.), (var2, 0.)], &ctx)));
         let var1 = var1.to_owned();
         let var2 = var2.to_owned();
-        Ok(Box::new(move |x, y| {
+        Ok(move |x, y| {
             self.eval_with_context(([(&var1, x), (&var2, y)], &ctx)).expect("Expr::bind2")
-        }))
+        })
     }
 
     /// Creates a function of three variables based on this expression, with default constants and
@@ -187,7 +184,7 @@ impl Expr {
                      var1: &str,
                      var2: &str,
                      var3: &str)
-                     -> Result<Box<Fn(f64, f64, f64) -> f64 + 'a>, Error> {
+                     -> Result<impl Fn(f64, f64, f64) -> f64 + 'a, Error> {
         self.bind3_with_context(builtin(), var1, var2, var3)
     }
 
@@ -204,16 +201,16 @@ impl Expr {
                                      var1: &str,
                                      var2: &str,
                                      var3: &str)
-                                     -> Result<Box<Fn(f64, f64, f64) -> f64 + 'a>, Error>
+                                     -> Result<impl Fn(f64, f64, f64) -> f64 + 'a, Error>
         where C: ContextProvider + 'a
     {
         try!(self.check_context(([(var1, 0.), (var2, 0.), (var3, 0.)], &ctx)));
         let var1 = var1.to_owned();
         let var2 = var2.to_owned();
         let var3 = var3.to_owned();
-        Ok(Box::new(move |x, y, z| {
+        Ok(move |x, y, z| {
             self.eval_with_context(([(&var1, x), (&var2, y), (&var3, z)], &ctx)).expect("Expr::bind3")
-        }))
+        })
     }
 
     /// Checks that the value of every variable in the expression is specified by the context `ctx`.
