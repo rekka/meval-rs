@@ -3,6 +3,15 @@
 - `bind` and `bind_with_context` functions return unboxed closures
   (requires Rust 1.26).
 
+- [#17](https://github.com/rekka/meval-rs/pull/17)
+
+    - Implement `bind4`, `bind4_with_context`, `bind5`,
+      `bind5_with_context` and `bindn`.
+
+    - Bugfix: Serialization from JSON now works as expected.
+
+- Drop support for serialization from non-self-describing formats.
+
 # 0.1.1
 
 - Implement `Default` for `Context`
