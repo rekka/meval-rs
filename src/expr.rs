@@ -980,6 +980,8 @@ pub mod de {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use de::as_f64;
+        use serde_json;
         use serde_test;
         #[test]
         fn test_deserialization() {
@@ -994,6 +996,37 @@ pub mod de {
             serde_test::assert_de_tokens(&expr, &[Token::F64(5.)]);
             serde_test::assert_de_tokens(&expr, &[Token::U8(5)]);
             serde_test::assert_de_tokens(&expr, &[Token::I8(5)]);
+        }
+
+        #[test]
+        fn test_json_deserialization() {
+            #[derive(Deserialize)]
+            struct Ode {
+                #[serde(deserialize_with = "as_f64")]
+                x0: f64,
+                #[serde(deserialize_with = "as_f64")]
+                t0: f64,
+                f: Expr,
+                g: Expr,
+                h: Expr,
+            }
+
+            let config = r#"
+            {
+                "x0": "cos(1.)",
+                "t0": 2,
+                "f": "sin(x)",
+                "g": 2.5,
+                "h": 5
+            }
+            "#;
+            let ode: Ode = serde_json::from_str(config).unwrap();
+
+            assert_eq!(ode.x0, 1f64.cos());
+            assert_eq!(ode.t0, 2f64);
+            assert_eq!(ode.f.bind("x").unwrap()(2.), 2f64.sin());
+            assert_eq!(ode.g.eval().unwrap(), 2.5f64);
+            assert_eq!(ode.h.eval().unwrap(), 5f64);
         }
     }
 }

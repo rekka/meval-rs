@@ -143,6 +143,7 @@
 //!     #[serde(deserialize_with = "meval::de::as_f64")]
 //!     t0: f64,
 //!     f: Expr,
+//!     g: Expr,
 //! }
 //!
 //! fn main() {
@@ -150,12 +151,14 @@
 //!         x0 = "cos(1.)"
 //!         t0 = 2
 //!         f = "sin(x)"
+//!         g = 2.5
 //!     "#;
 //!     let ode: Ode = toml::from_str(config).unwrap();
 //!
 //!     assert_eq!(ode.x0, 1f64.cos());
 //!     assert_eq!(ode.t0, 2f64);
 //!     assert_eq!(ode.f.bind("x").unwrap()(2.), 2f64.sin());
+//!     assert_eq!(ode.g.eval().unwrap(), 2.5f64);
 //! }
 //!
 //! ```
@@ -185,6 +188,11 @@ extern crate nom;
 extern crate fnv;
 #[cfg(feature = "serde")]
 extern crate serde;
+#[cfg_attr(all(test, feature = "serde"), macro_use)]
+#[cfg(all(test, feature = "serde"))]
+extern crate serde_derive;
+#[cfg(test)]
+extern crate serde_json;
 #[cfg(test)]
 extern crate serde_test;
 

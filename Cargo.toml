@@ -20,6 +20,7 @@ serde = { version = "1", optional = true }
 gnuplot = "0.0.23"
 serde_test = "1"
 serde_derive = "1"
+serde_json = "1"
 toml = "0.4.5"
 
 [features]
