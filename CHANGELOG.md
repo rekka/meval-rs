@@ -1,4 +1,4 @@
-# Unreleased
+# 0.2
 
 - `bind` and `bind_with_context` functions return unboxed closures
   (requires Rust 1.26).
