@@ -698,6 +698,7 @@ impl<'a> Context<'a> {
             ctx.func("sqrt", f64::sqrt);
             ctx.func("exp", f64::exp);
             ctx.func("ln", f64::ln);
+            ctx.func("log10", f64::log10);
             ctx.func("abs", f64::abs);
             ctx.func("sin", f64::sin);
             ctx.func("cos", f64::cos);
