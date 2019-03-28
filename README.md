@@ -102,7 +102,7 @@ assert_eq!(func(2.), 5.);
 `meval` supports basic mathematical operations on floating point numbers:
 
 - binary operators: `+`, `-`, `*`, `/`, `%` (remainder), `^` (power)
-- unary operators: `+`, `-`
+- unary operators: `+`, `-`, `!` (factorial)
 
 It supports custom variables and functions like `x`, `weight`, `C_0`, `f(1)`, etc. A variable
 or function name must start with `[a-zA-Z_]` and can contain only `[a-zA-Z0-9_]`. Custom

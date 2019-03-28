@@ -199,6 +199,7 @@ extern crate serde_test;
 use std::fmt;
 
 mod expr;
+mod extra_math;
 pub mod shunting_yard;
 pub mod tokenizer;
 
@@ -218,6 +219,8 @@ pub enum Error {
     ParseError(ParseError),
     /// The shunting-yard algorithm returned an error.
     RPNError(RPNError),
+    // A catch all for all other errors during evaluation
+    EvalError(String),
 }
 
 impl fmt::Display for Error {
@@ -235,6 +238,10 @@ impl fmt::Display for Error {
             }
             Error::RPNError(ref e) => {
                 try!(write!(f, "RPN error: "));
+                e.fmt(f)
+            }
+            Error::EvalError(ref e) => {
+                try!(write!(f, "Eval error: "));
                 e.fmt(f)
             }
         }
@@ -258,8 +265,9 @@ impl std::error::Error for Error {
         match *self {
             Error::UnknownVariable(_) => "unknown variable",
             Error::Function(_, _) => "function evaluation error",
+             Error::EvalError(_) => "eval error",
             Error::ParseError(ref e) => e.description(),
-            Error::RPNError(ref e) => e.description(),
+            Error::RPNError(ref e) => e.description()
         }
     }
 
@@ -268,7 +276,7 @@ impl std::error::Error for Error {
             Error::ParseError(ref e) => Some(e),
             Error::RPNError(ref e) => Some(e),
             Error::Function(_, ref e) => Some(e),
-            _ => None,
+            _ => None
         }
     }
 }
