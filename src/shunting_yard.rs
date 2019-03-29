@@ -214,8 +214,26 @@ mod tests {
             Ok(vec![Number(1.), Unary(Fact), Number(2.), Binary(Pow)])
         );
         assert_eq!(
-            to_rpn(&[Number(1.), Binary(Times), Number(2.), Unary(Fact)]),
-            Ok(vec![Number(1.), Number(2.), Unary(Fact), Binary(Times)])
+            to_rpn(&[
+                Number(1.), 
+                Unary(Fact), 
+                Binary(Div), 
+                LParen, 
+                Number(2.), 
+                Binary(Plus), 
+                Number(3.), 
+                RParen, 
+                Unary(Fact)
+            ]),
+            Ok(vec![
+                Number(1.), 
+                Unary(Fact), 
+                Number(2.), 
+                Number(3.), 
+                Binary(Plus), 
+                Unary(Fact), 
+                Binary(Div)
+            ])
         );
         assert_eq!(
             to_rpn(&[

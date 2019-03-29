@@ -79,10 +79,10 @@ impl Expr {
                             // Check to make sure x has no fractional component (can be converted to int without loss)
                             if x.fract() != 0. || x < 0. {
                                 return Err(Error::EvalError(format!("({})! cannot be evaluated. Must be a non-negative integer!", x)))
-                            } else if x > 20. {
+                            } else if x > 170. {
                                 std::f64::INFINITY
                             } else {
-                                factorial(x as u64) as f64
+                                factorial(x)
                             }
                         }
                         _ => return Err(Error::EvalError(format!("Unimplemented unary operation: {:?}", op))),
@@ -1057,7 +1057,10 @@ mod tests {
         assert_eq!(eval_str("2 + (3 + 4)"), Ok(9.));
         assert_eq!(eval_str("-2^(4 - 3) * (3 + 4)"), Ok(-14.));
         assert_eq!(eval_str("-2*3! + 1"), Ok(-11.));
-        assert_eq!(eval_str("25!"), Ok(std::f64::INFINITY));
+        assert_eq!(eval_str("170!"), Ok(7.257415615307994e306));
+        assert_eq!(eval_str("171!"), Ok(std::f64::INFINITY));
+        assert_eq!(eval_str("-171!"), Ok(std::f64::NEG_INFINITY));
+        assert_eq!(eval_str("150!/148!"), Ok(22350.));
         assert_eq!(eval_str("a + 3"), Err(Error::UnknownVariable("a".into())));
         assert_eq!(eval_str("round(sin (pi) * cos(0))"), Ok(0.));
         assert_eq!(eval_str("round( sqrt(3^2 + 4^2)) "), Ok(5.));
