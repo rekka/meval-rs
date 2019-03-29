@@ -6,11 +6,11 @@ use std::str::FromStr;
 
 type ContextHashMap<K, V> = FnvHashMap<K, V>;
 
+use extra_math::factorial;
 use shunting_yard::to_rpn;
 use std;
 use std::fmt;
 use tokenizer::{tokenize, Token};
-use extra_math::factorial;
 use Error;
 
 /// Representation of a parsed expression.
@@ -66,7 +66,12 @@ impl Expr {
                         Div => left / right,
                         Rem => left % right,
                         Pow => left.powf(right),
-                        _ => return Err(Error::EvalError(format!("Unimplemented binary operation: {:?}", op))),
+                        _ => {
+                            return Err(Error::EvalError(format!(
+                                "Unimplemented binary operation: {:?}",
+                                op
+                            )));
+                        }
                     };
                     stack.push(r);
                 }
@@ -79,10 +84,15 @@ impl Expr {
                             // Check to make sure x has no fractional component (can be converted to int without loss)
                             match factorial(x) {
                                 Ok(res) => res,
-                                Err(e) => return Err(Error::EvalError(String::from(e)))
+                                Err(e) => return Err(Error::EvalError(String::from(e))),
                             }
                         }
-                        _ => return Err(Error::EvalError(format!("Unimplemented unary operation: {:?}", op))),
+                        _ => {
+                            return Err(Error::EvalError(format!(
+                                "Unimplemented unary operation: {:?}",
+                                op
+                            )));
+                        }
                     };
                     stack.push(r);
                 }
@@ -92,7 +102,7 @@ impl Expr {
                             "eval: stack does not have enough arguments for function token \
                              {:?}",
                             token
-                        )))
+                        )));
                     }
                     match ctx.eval_func(n, &stack[stack.len() - i..]) {
                         Ok(r) => {
@@ -109,7 +119,10 @@ impl Expr {
 
         let r = stack.pop().expect("Stack is empty, this is impossible.");
         if !stack.is_empty() {
-            return Err(Error::EvalError(format!("There are still {} items on the stack.", stack.len())))
+            return Err(Error::EvalError(format!(
+                "There are still {} items on the stack.",
+                stack.len()
+            )));
         }
         Ok(r)
     }
@@ -344,7 +357,8 @@ impl Expr {
                     (&var5, x5),
                 ],
                 &ctx,
-            )).expect("Expr::bind5")
+            ))
+            .expect("Expr::bind5")
         })
     }
 
@@ -375,14 +389,12 @@ impl Expr {
         C: ContextProvider + 'a,
     {
         let n = vars.len();
-        try!(
-            self.check_context((
-                vars.into_iter()
-                    .zip(vec![0.; n].into_iter())
-                    .collect::<Vec<_>>(),
-                &ctx
-            ))
-        );
+        try!(self.check_context((
+            vars.into_iter()
+                .zip(vec![0.; n].into_iter())
+                .collect::<Vec<_>>(),
+            &ctx
+        )));
         let vars = vars.iter().map(|v| v.to_owned()).collect::<Vec<_>>();
         Ok(move |x: &[f64]| {
             self.eval_with_context((
@@ -391,7 +403,8 @@ impl Expr {
                     .map(|(v, x)| (v, *x))
                     .collect::<Vec<_>>(),
                 &ctx,
-            )).expect("Expr::bindn")
+            ))
+            .expect("Expr::bindn")
         })
     }
 
@@ -415,7 +428,10 @@ impl Expr {
                     }
                 }
                 Token::Func(_, None) => {
-                    return Err(Error::EvalError(format!("expr::check_context: Unexpected token: {:?}", *t)))
+                    return Err(Error::EvalError(format!(
+                        "expr::check_context: Unexpected token: {:?}",
+                        *t
+                    )));
                 }
                 Token::LParen
                 | Token::RParen
@@ -1069,7 +1085,7 @@ mod tests {
         assert_eq!(eval_str("10 % 9"), Ok(10f64 % 9f64));
 
         match eval_str("0.5!") {
-            Err(Error::EvalError(_)) => {},
+            Err(Error::EvalError(_)) => {}
             _ => panic!("Cannot evaluate factorial of non-integer"),
         }
     }

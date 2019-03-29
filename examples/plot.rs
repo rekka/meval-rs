@@ -36,7 +36,7 @@ fn main() {
             let func = match expr.bind("x") {
                 Ok(func) => func,
                 Err(e) => {
-                    return println!("Error when trying to bind variable `x` in {}: {}", arg, e)
+                    return println!("Error when trying to bind variable `x` in {}: {}", arg, e);
                 }
             };
 

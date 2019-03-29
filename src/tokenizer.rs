@@ -57,7 +57,7 @@ pub enum Operation {
     Div,
     Rem,
     Pow,
-    Fact
+    Fact,
 }
 
 /// Expression tokens.
@@ -103,7 +103,10 @@ named!(
     )
 );
 
-named!(fact<Token>, chain!(tag!("!"), || Token::Unary(Operation::Fact)));
+named!(
+    fact<Token>,
+    chain!(tag!("!"), || Token::Unary(Operation::Fact))
+);
 named!(lparen<Token>, chain!(tag!("("), || Token::LParen));
 named!(rparen<Token>, chain!(tag!(")"), || Token::RParen));
 named!(comma<Token>, chain!(tag!(","), || Token::Comma));
@@ -125,7 +128,8 @@ fn ident(input: &[u8]) -> IResult<&[u8], &[u8]> {
                 .take_while(|&&c| match c {
                     b'a'...b'z' | b'A'...b'Z' | b'_' | b'0'...b'9' => true,
                     _ => false,
-                }).count();
+                })
+                .count();
             let (parsed, rest) = input.split_at(n + 1);
             Done(rest, parsed)
         }
@@ -234,7 +238,11 @@ named!(
 );
 named!(
     after_rexpr<Token>,
-    delimited!(opt!(multispace), alt!(fact | binop | rparen), opt!(multispace))
+    delimited!(
+        opt!(multispace),
+        alt!(fact | binop | rparen),
+        opt!(multispace)
+    )
 );
 named!(
     after_rexpr_no_paren<Token>,
@@ -505,7 +513,14 @@ mod tests {
 
         assert_eq!(
             tokenize("1 + 3! + 1"),
-            Ok(vec![Number(1f64), Binary(Plus), Number(3f64), Unary(Fact), Binary(Plus), Number(1f64)])
+            Ok(vec![
+                Number(1f64),
+                Binary(Plus),
+                Number(3f64),
+                Unary(Fact),
+                Binary(Plus),
+                Number(1f64)
+            ])
         );
 
         assert_eq!(tokenize("!3"), Err(ParseError::UnexpectedToken(0)));

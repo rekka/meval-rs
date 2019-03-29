@@ -265,9 +265,9 @@ impl std::error::Error for Error {
         match *self {
             Error::UnknownVariable(_) => "unknown variable",
             Error::Function(_, _) => "function evaluation error",
-             Error::EvalError(_) => "eval error",
+            Error::EvalError(_) => "eval error",
             Error::ParseError(ref e) => e.description(),
-            Error::RPNError(ref e) => e.description()
+            Error::RPNError(ref e) => e.description(),
         }
     }
 
@@ -276,7 +276,7 @@ impl std::error::Error for Error {
             Error::ParseError(ref e) => Some(e),
             Error::RPNError(ref e) => Some(e),
             Error::Function(_, ref e) => Some(e),
-            _ => None
+            _ => None,
         }
     }
 }
