@@ -66,7 +66,7 @@ impl Expr {
                         Div => left / right,
                         Rem => left % right,
                         Pow => left.powf(right),
-                        _ => panic!("Unimplemented binary operation: {:?}", op),
+                        _ => return Err(Error::EvalError(format!("Unimplemented binary operation: {:?}", op))),
                     };
                     stack.push(r);
                 }
@@ -77,12 +77,9 @@ impl Expr {
                         Minus => -x,
                         Fact => {
                             // Check to make sure x has no fractional component (can be converted to int without loss)
-                            if x.fract() != 0. || x < 0. {
-                                return Err(Error::EvalError(format!("({})! cannot be evaluated. Must be a non-negative integer!", x)))
-                            } else if x > 170. {
-                                std::f64::INFINITY
-                            } else {
-                                factorial(x)
+                            match factorial(x) {
+                                Ok(res) => res,
+                                Err(e) => return Err(Error::EvalError(String::from(e)))
                             }
                         }
                         _ => return Err(Error::EvalError(format!("Unimplemented unary operation: {:?}", op))),
@@ -1057,8 +1054,6 @@ mod tests {
         assert_eq!(eval_str("2 + (3 + 4)"), Ok(9.));
         assert_eq!(eval_str("-2^(4 - 3) * (3 + 4)"), Ok(-14.));
         assert_eq!(eval_str("-2*3! + 1"), Ok(-11.));
-        assert_eq!(eval_str("170!"), Ok(7.257415615307994e306));
-        assert_eq!(eval_str("171!"), Ok(std::f64::INFINITY));
         assert_eq!(eval_str("-171!"), Ok(std::f64::NEG_INFINITY));
         assert_eq!(eval_str("150!/148!"), Ok(22350.));
         assert_eq!(eval_str("a + 3"), Err(Error::UnknownVariable("a".into())));
@@ -1072,11 +1067,6 @@ mod tests {
             Ok((1f64).sin() + (2f64).cos())
         );
         assert_eq!(eval_str("10 % 9"), Ok(10f64 % 9f64));
-
-        match eval_str("(-2)!") {
-            Err(Error::EvalError(_)) => {},
-            _ => panic!("Cannot evaluate factorial of -2"),
-        }
 
         match eval_str("0.5!") {
             Err(Error::EvalError(_)) => {},
