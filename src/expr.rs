@@ -2,6 +2,7 @@ use fnv::FnvHashMap;
 use std::f64::consts;
 use std::ops::Deref;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::str::FromStr;
 
 type ContextHashMap<K, V> = FnvHashMap<K, V>;
@@ -532,6 +533,8 @@ pub enum FuncEvalError {
     UnknownFunction,
 }
 
+unsafe impl Send for FuncEvalError {}
+
 impl fmt::Display for FuncEvalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -916,6 +919,256 @@ impl<'a> ContextProvider for Context<'a> {
     }
 }
 
+/// A thread-safe structure for storing variables/constants and functions to be used in an expression.
+///
+/// # Example
+///
+/// ```rust
+/// use meval::{eval_str_with_context, AtomicContext};
+///
+/// let mut ctx = AtomicContext::new(); // builtins
+/// ctx.var("x", 3.)
+///    .func("f", |x| 2. * x)
+///    .funcn("sum", |xs| xs.iter().sum(), ..);
+///
+/// assert_eq!(eval_str_with_context("pi + sum(1., 2.) + f(x)", &ctx),
+///            Ok(std::f64::consts::PI + 1. + 2. + 2. * 3.));
+/// ```
+#[derive(Clone)]
+pub struct AtomicContext<'a> {
+    vars: ContextHashMap<String, f64>,
+    funcs: ContextHashMap<String, AtomicGuardedFunc<'a>>,
+}
+
+impl<'a> AtomicContext<'a> {
+    /// Creates a context with built-in constants and functions.
+    pub fn new() -> AtomicContext<'a> {
+        thread_local!(static DEFAULT_CONTEXT: AtomicContext<'static> = {
+            let mut ctx = AtomicContext::empty();
+            ctx.var("pi", consts::PI);
+            ctx.var("e", consts::E);
+
+            ctx.func("sqrt", f64::sqrt);
+            ctx.func("exp", f64::exp);
+            ctx.func("ln", f64::ln);
+            ctx.func("abs", f64::abs);
+            ctx.func("sin", f64::sin);
+            ctx.func("cos", f64::cos);
+            ctx.func("tan", f64::tan);
+            ctx.func("asin", f64::asin);
+            ctx.func("acos", f64::acos);
+            ctx.func("atan", f64::atan);
+            ctx.func("sinh", f64::sinh);
+            ctx.func("cosh", f64::cosh);
+            ctx.func("tanh", f64::tanh);
+            ctx.func("asinh", f64::asinh);
+            ctx.func("acosh", f64::acosh);
+            ctx.func("atanh", f64::atanh);
+            ctx.func("floor", f64::floor);
+            ctx.func("ceil", f64::ceil);
+            ctx.func("round", f64::round);
+            ctx.func("signum", f64::signum);
+            ctx.func2("atan2", f64::atan2);
+            ctx.funcn("max", max_array, 1..);
+            ctx.funcn("min", min_array, 1..);
+            ctx
+        });
+
+        DEFAULT_CONTEXT.with(|ctx| ctx.clone())
+    }
+
+    /// Creates an empty contexts.
+    pub fn empty() -> AtomicContext<'a> {
+        AtomicContext {
+            vars: ContextHashMap::default(),
+            funcs: ContextHashMap::default(),
+        }
+    }
+
+    /// Adds a new variable/constant.
+    pub fn var<S: Into<String>>(&mut self, var: S, value: f64) -> &mut Self {
+        self.vars.insert(var.into(), value);
+        self
+    }
+
+    /// Adds a new function of one argument.
+    pub fn func<S, F>(&mut self, name: S, func: F) -> &mut Self
+    where
+        S: Into<String>,
+        F: Fn(f64) -> f64 + 'a + Send + Sync,
+    {
+        self.funcs.insert(
+            name.into(),
+            Arc::new(move |args: &[f64]| {
+                if args.len() == 1 {
+                    Ok(func(args[0]))
+                } else {
+                    Err(FuncEvalError::NumberArgs(1))
+                }
+            }),
+        );
+        self
+    }
+
+    /// Adds a new function of two arguments.
+    pub fn func2<S, F>(&mut self, name: S, func: F) -> &mut Self
+    where
+        S: Into<String>,
+        F: Fn(f64, f64) -> f64 + 'a + Send + Sync,
+    {
+        self.funcs.insert(
+            name.into(),
+            Arc::new(move |args: &[f64]| {
+                if args.len() == 2 {
+                    Ok(func(args[0], args[1]))
+                } else {
+                    Err(FuncEvalError::NumberArgs(2))
+                }
+            }),
+        );
+        self
+    }
+
+    /// Adds a new function of three arguments.
+    pub fn func3<S, F>(&mut self, name: S, func: F) -> &mut Self
+    where
+        S: Into<String>,
+        F: Fn(f64, f64, f64) -> f64 + 'a + Send + Sync,
+    {
+        self.funcs.insert(
+            name.into(),
+            Arc::new(move |args: &[f64]| {
+                if args.len() == 3 {
+                    Ok(func(args[0], args[1], args[2]))
+                } else {
+                    Err(FuncEvalError::NumberArgs(3))
+                }
+            }),
+        );
+        self
+    }
+
+    /// Adds a new function of a variable number of arguments.
+    ///
+    /// `n_args` specifies the allowed number of variables by giving an exact number `n` or a range
+    /// `n..m`, `..`, `n..`, `..m`. The range is half-open, exclusive on the right, as is common in
+    /// Rust standard library.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut ctx = meval::AtomicContext::empty();
+    ///
+    /// // require exactly 2 arguments
+    /// ctx.funcn("sum_two", |xs| xs[0] + xs[1], 2);
+    ///
+    /// // allow an arbitrary number of arguments
+    /// ctx.funcn("sum", |xs| xs.iter().sum(), ..);
+    /// ```
+    pub fn funcn<S, F, N>(&mut self, name: S, func: F, n_args: N) -> &mut Self
+    where
+        S: Into<String>,
+        F: Fn(&[f64]) -> f64 + 'a + Send + Sync,
+        N: AtomicArgGuard,
+    {
+        self.funcs.insert(name.into(), n_args.to_atomic_arg_guard(func));
+        self
+    }
+}
+
+impl<'a> Default for AtomicContext<'a> {
+    fn default() -> Self {
+        AtomicContext::new()
+    }
+}
+
+type AtomicGuardedFunc<'a> = Arc<Fn(&[f64]) -> Result<f64, FuncEvalError> + 'a + Send + Sync>;
+
+/// Trait for types that can specify the number of required arguments for a thread-safe function with a
+/// variable number of arguments.
+///
+/// # Example
+///
+/// ```rust
+/// let mut ctx = meval::AtomicContext::empty();
+///
+/// // require exactly 2 arguments
+/// ctx.funcn("sum_two", |xs| xs[0] + xs[1], 2);
+///
+/// // allow an arbitrary number of arguments
+/// ctx.funcn("sum", |xs| xs.iter().sum(), ..);
+/// ```
+pub trait AtomicArgGuard {
+    fn to_atomic_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a + Send + Sync>(self, func: F) -> AtomicGuardedFunc<'a>;
+}
+
+impl AtomicArgGuard for usize {
+    fn to_atomic_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a + Send + Sync>(self, func: F) -> AtomicGuardedFunc<'a> {
+        Arc::new(move |args: &[f64]| {
+            if args.len() == self {
+                Ok(func(args))
+            } else {
+                Err(FuncEvalError::NumberArgs(1))
+            }
+        })
+    }
+}
+
+impl AtomicArgGuard for std::ops::RangeFrom<usize> {
+    fn to_atomic_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a + Send + Sync>(self, func: F) -> AtomicGuardedFunc<'a> {
+        Arc::new(move |args: &[f64]| {
+            if args.len() >= self.start {
+                Ok(func(args))
+            } else {
+                Err(FuncEvalError::TooFewArguments)
+            }
+        })
+    }
+}
+
+impl AtomicArgGuard for std::ops::RangeTo<usize> {
+    fn to_atomic_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a + Send + Sync>(self, func: F) -> AtomicGuardedFunc<'a> {
+        Arc::new(move |args: &[f64]| {
+            if args.len() < self.end {
+                Ok(func(args))
+            } else {
+                Err(FuncEvalError::TooManyArguments)
+            }
+        })
+    }
+}
+
+impl AtomicArgGuard for std::ops::Range<usize> {
+    fn to_atomic_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a + Send + Sync>(self, func: F) -> AtomicGuardedFunc<'a> {
+        Arc::new(move |args: &[f64]| {
+            if args.len() >= self.start && args.len() < self.end {
+                Ok(func(args))
+            } else if args.len() < self.start {
+                Err(FuncEvalError::TooFewArguments)
+            } else {
+                Err(FuncEvalError::TooManyArguments)
+            }
+        })
+    }
+}
+
+impl AtomicArgGuard for std::ops::RangeFull {
+    fn to_atomic_arg_guard<'a, F: Fn(&[f64]) -> f64 + 'a + Send + Sync>(self, func: F) -> AtomicGuardedFunc<'a> {
+        Arc::new(move |args: &[f64]| Ok(func(args)))
+    }
+}
+
+impl<'a> ContextProvider for AtomicContext<'a> {
+    fn get_var(&self, name: &str) -> Option<f64> {
+        self.vars.get(name).cloned()
+    }
+    fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
+        self.funcs
+            .get(name)
+            .map_or(Err(FuncEvalError::UnknownFunction), |f| f(args))
+    }
+}
+
 #[cfg(feature = "serde")]
 pub mod de {
     use super::Expr;
@@ -1035,6 +1288,7 @@ pub mod de {
 mod tests {
     use super::*;
     use std::str::FromStr;
+    use std::thread;
     use Error;
 
     #[test]
@@ -1165,4 +1419,19 @@ mod tests {
             ctx.func2("g", |x, y| x + y);
         }
     }
+
+    #[test]
+    fn send_atomic_context() {
+        let y = 0.;
+        {
+            let z = 0.;
+
+            let mut ctx = AtomicContext::new();
+            thread::spawn(move || {
+                ctx.var("x", 1.).func("f", move |x| x + y).func("g", move |x| x + z);
+                ctx.func2("g", move |x, y| x + y);
+            });
+        }
+    }
+
 }
