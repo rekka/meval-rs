@@ -6,6 +6,7 @@ use std::str::FromStr;
 
 type ContextHashMap<K, V> = FnvHashMap<K, V>;
 
+use extra_math::factorial;
 use shunting_yard::to_rpn;
 use std;
 use std::fmt;
@@ -65,24 +66,43 @@ impl Expr {
                         Div => left / right,
                         Rem => left % right,
                         Pow => left.powf(right),
+                        _ => {
+                            return Err(Error::EvalError(format!(
+                                "Unimplemented binary operation: {:?}",
+                                op
+                            )));
+                        }
                     };
                     stack.push(r);
                 }
                 Unary(op) => {
                     let x = stack.pop().unwrap();
-                    match op {
-                        Plus => stack.push(x),
-                        Minus => stack.push(-x),
-                        _ => panic!("Unimplement unary operation: {:?}", op),
-                    }
+                    let r = match op {
+                        Plus => x,
+                        Minus => -x,
+                        Fact => {
+                            // Check to make sure x has no fractional component (can be converted to int without loss)
+                            match factorial(x) {
+                                Ok(res) => res,
+                                Err(e) => return Err(Error::EvalError(String::from(e))),
+                            }
+                        }
+                        _ => {
+                            return Err(Error::EvalError(format!(
+                                "Unimplemented unary operation: {:?}",
+                                op
+                            )));
+                        }
+                    };
+                    stack.push(r);
                 }
                 Func(ref n, Some(i)) => {
                     if stack.len() < i {
-                        panic!(
+                        return Err(Error::EvalError(format!(
                             "eval: stack does not have enough arguments for function token \
                              {:?}",
                             token
-                        );
+                        )));
                     }
                     match ctx.eval_func(n, &stack[stack.len() - i..]) {
                         Ok(r) => {
@@ -93,13 +113,16 @@ impl Expr {
                         Err(e) => return Err(Error::Function(n.to_owned(), e)),
                     }
                 }
-                _ => panic!("Unrecognized token: {:?}", token),
+                _ => return Err(Error::EvalError(format!("Unrecognized token: {:?}", token))),
             }
         }
 
         let r = stack.pop().expect("Stack is empty, this is impossible.");
         if !stack.is_empty() {
-            panic!("There are still {} items on the stack.", stack.len());
+            return Err(Error::EvalError(format!(
+                "There are still {} items on the stack.",
+                stack.len()
+            )));
         }
         Ok(r)
     }
@@ -334,7 +357,8 @@ impl Expr {
                     (&var5, x5),
                 ],
                 &ctx,
-            )).expect("Expr::bind5")
+            ))
+            .expect("Expr::bind5")
         })
     }
 
@@ -365,14 +389,12 @@ impl Expr {
         C: ContextProvider + 'a,
     {
         let n = vars.len();
-        try!(
-            self.check_context((
-                vars.into_iter()
-                    .zip(vec![0.; n].into_iter())
-                    .collect::<Vec<_>>(),
-                &ctx
-            ))
-        );
+        try!(self.check_context((
+            vars.into_iter()
+                .zip(vec![0.; n].into_iter())
+                .collect::<Vec<_>>(),
+            &ctx
+        )));
         let vars = vars.iter().map(|v| v.to_owned()).collect::<Vec<_>>();
         Ok(move |x: &[f64]| {
             self.eval_with_context((
@@ -381,7 +403,8 @@ impl Expr {
                     .map(|(v, x)| (v, *x))
                     .collect::<Vec<_>>(),
                 &ctx,
-            )).expect("Expr::bindn")
+            ))
+            .expect("Expr::bindn")
         })
     }
 
@@ -405,7 +428,10 @@ impl Expr {
                     }
                 }
                 Token::Func(_, None) => {
-                    panic!("expr::check_context: Unexpected token: {:?}", *t);
+                    return Err(Error::EvalError(format!(
+                        "expr::check_context: Unexpected token: {:?}",
+                        *t
+                    )));
                 }
                 Token::LParen
                 | Token::RParen
@@ -698,6 +724,7 @@ impl<'a> Context<'a> {
             ctx.func("sqrt", f64::sqrt);
             ctx.func("exp", f64::exp);
             ctx.func("ln", f64::ln);
+            ctx.func("log10", f64::log10);
             ctx.func("abs", f64::abs);
             ctx.func("sin", f64::sin);
             ctx.func("cos", f64::cos);
@@ -1042,6 +1069,9 @@ mod tests {
         assert_eq!(eval_str("2 + 3"), Ok(5.));
         assert_eq!(eval_str("2 + (3 + 4)"), Ok(9.));
         assert_eq!(eval_str("-2^(4 - 3) * (3 + 4)"), Ok(-14.));
+        assert_eq!(eval_str("-2*3! + 1"), Ok(-11.));
+        assert_eq!(eval_str("-171!"), Ok(std::f64::NEG_INFINITY));
+        assert_eq!(eval_str("150!/148!"), Ok(22350.));
         assert_eq!(eval_str("a + 3"), Err(Error::UnknownVariable("a".into())));
         assert_eq!(eval_str("round(sin (pi) * cos(0))"), Ok(0.));
         assert_eq!(eval_str("round( sqrt(3^2 + 4^2)) "), Ok(5.));
@@ -1053,6 +1083,11 @@ mod tests {
             Ok((1f64).sin() + (2f64).cos())
         );
         assert_eq!(eval_str("10 % 9"), Ok(10f64 % 9f64));
+
+        match eval_str("0.5!") {
+            Err(Error::EvalError(_)) => {}
+            _ => panic!("Cannot evaluate factorial of non-integer"),
+        }
     }
 
     #[test]

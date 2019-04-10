@@ -72,9 +72,11 @@ fn prec_assoc(token: &Token) -> (u32, Associativity) {
             Plus | Minus => (1, Left),
             Times | Div | Rem => (2, Left),
             Pow => (4, Right),
+            _ => unimplemented!(),
         },
         Unary(op) => match op {
             Plus | Minus => (3, NA),
+            Fact => (5, NA),
             _ => unimplemented!(),
         },
         Var(_) | Number(_) | Func(..) | LParen | RParen | Comma => (0, NA),
@@ -206,6 +208,32 @@ mod tests {
         assert_eq!(
             to_rpn(&[Unary(Minus), Number(1.), Binary(Pow), Number(2.)]),
             Ok(vec![Number(1.), Number(2.), Binary(Pow), Unary(Minus)])
+        );
+        assert_eq!(
+            to_rpn(&[Number(1.), Unary(Fact), Binary(Pow), Number(2.)]),
+            Ok(vec![Number(1.), Unary(Fact), Number(2.), Binary(Pow)])
+        );
+        assert_eq!(
+            to_rpn(&[
+                Number(1.),
+                Unary(Fact),
+                Binary(Div),
+                LParen,
+                Number(2.),
+                Binary(Plus),
+                Number(3.),
+                RParen,
+                Unary(Fact)
+            ]),
+            Ok(vec![
+                Number(1.),
+                Unary(Fact),
+                Number(2.),
+                Number(3.),
+                Binary(Plus),
+                Unary(Fact),
+                Binary(Div)
+            ])
         );
         assert_eq!(
             to_rpn(&[
