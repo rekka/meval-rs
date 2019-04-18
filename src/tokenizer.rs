@@ -57,6 +57,7 @@ pub enum Operation {
     Div,
     Rem,
     Pow,
+    Fact,
 }
 
 /// Expression tokens.
@@ -95,13 +96,17 @@ named!(
 );
 
 named!(
-    unop<Token>,
+    negpos<Token>,
     alt!(
         chain!(tag!("+"), || Token::Unary(Operation::Plus))
             | chain!(tag!("-"), || Token::Unary(Operation::Minus))
     )
 );
 
+named!(
+    fact<Token>,
+    chain!(tag!("!"), || Token::Unary(Operation::Fact))
+);
 named!(lparen<Token>, chain!(tag!("("), || Token::LParen));
 named!(rparen<Token>, chain!(tag!(")"), || Token::RParen));
 named!(comma<Token>, chain!(tag!(","), || Token::Comma));
@@ -123,7 +128,8 @@ fn ident(input: &[u8]) -> IResult<&[u8], &[u8]> {
                 .take_while(|&&c| match c {
                     b'a'...b'z' | b'A'...b'Z' | b'_' | b'0'...b'9' => true,
                     _ => false,
-                }).count();
+                })
+                .count();
             let (parsed, rest) = input.split_at(n + 1);
             Done(rest, parsed)
         }
@@ -226,32 +232,36 @@ named!(
     lexpr<Token>,
     delimited!(
         opt!(multispace),
-        alt!(number | func | var | unop | lparen),
+        alt!(number | func | var | negpos | lparen),
         opt!(multispace)
     )
 );
 named!(
     after_rexpr<Token>,
-    delimited!(opt!(multispace), alt!(binop | rparen), opt!(multispace))
+    delimited!(
+        opt!(multispace),
+        alt!(fact | binop | rparen),
+        opt!(multispace)
+    )
 );
 named!(
     after_rexpr_no_paren<Token>,
-    delimited!(opt!(multispace), alt!(binop), opt!(multispace))
+    delimited!(opt!(multispace), alt!(fact | binop), opt!(multispace))
 );
 named!(
     after_rexpr_comma<Token>,
     delimited!(
         opt!(multispace),
-        alt!(binop | rparen | comma),
+        alt!(fact | binop | rparen | comma),
         opt!(multispace)
     )
 );
 
 #[derive(Debug, Clone, Copy)]
 enum TokenizerState {
-    // accept any token that is an expression from the left: var, num, (, unop
+    // accept any token that is an expression from the left: var, num, (, negpos
     LExpr,
-    // accept any token that needs an expression on the left: binop, ), comma
+    // accept any token that needs an expression on the left: fact, binop, ), comma
     AfterRExpr,
 }
 
@@ -500,6 +510,20 @@ mod tests {
             tokenize("2 % 3"),
             Ok(vec![Number(2f64), Binary(Rem), Number(3f64)])
         );
+
+        assert_eq!(
+            tokenize("1 + 3! + 1"),
+            Ok(vec![
+                Number(1f64),
+                Binary(Plus),
+                Number(3f64),
+                Unary(Fact),
+                Binary(Plus),
+                Number(1f64)
+            ])
+        );
+
+        assert_eq!(tokenize("!3"), Err(ParseError::UnexpectedToken(0)));
 
         assert_eq!(tokenize("()"), Err(ParseError::UnexpectedToken(1)));
 
