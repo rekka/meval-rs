@@ -1,3 +1,4 @@
+
 //! Implementation of the shunting-yard algorithm for converting an infix expression to an
 //! expression in reverse Polish notation (RPN).
 //!

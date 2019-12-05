@@ -208,7 +208,7 @@ pub mod de;
 
 pub use expr::*;
 pub use shunting_yard::RPNError;
-pub use tokenizer::ParseError;
+pub use tokenizer::TokenParseError;
 
 /// An error produced during parsing or evaluation.
 #[derive(Debug, Clone, PartialEq)]
@@ -216,7 +216,7 @@ pub enum Error {
     UnknownVariable(String),
     Function(String, FuncEvalError),
     /// An error returned by the parser.
-    ParseError(ParseError),
+    ParseError(TokenParseError),
     /// The shunting-yard algorithm returned an error.
     RPNError(RPNError),
     // A catch all for all other errors during evaluation
@@ -248,8 +248,8 @@ impl fmt::Display for Error {
     }
 }
 
-impl From<ParseError> for Error {
-    fn from(err: ParseError) -> Error {
+impl From<TokenParseError> for Error {
+    fn from(err: TokenParseError) -> Error {
         Error::ParseError(err)
     }
 }

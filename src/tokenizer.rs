@@ -6,9 +6,6 @@
 //!
 //! [nom]: https://crates.io/crates/nom
 
-#[macro_use]
-extern crate nom;
-
 use nom::{
   branch::alt,
   bytes::complete::is_a,
@@ -32,24 +29,30 @@ pub enum TokenParseError {
     /// A token that is not allowed at the given location (contains the location of the offending
     /// character in the source string).
     UnexpectedToken(usize),
+
+    UnexpectedStrToken(String),
     /// Missing right parentheses at the end of the source string (contains the number of missing
     /// parens).
     MissingRParen(i32),
     /// Missing operator or function argument at the end of the expression.
     MissingArgument,
+
+    UnknownError
 }
 
 impl fmt::Display for TokenParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
+        match &*self {
             TokenParseError::UnexpectedToken(i) => write!(f, "Unexpected token at byte {}.", i),
+            TokenParseError::UnexpectedStrToken(s) => write!(f, "Unexpected token {}.", s),
             TokenParseError::MissingRParen(i) => write!(
                 f,
                 "Missing {} right parenthes{}.",
                 i,
-                if i == 1 { "is" } else { "es" }
+                if *i == 1 { "is" } else { "es" }
             ),
             TokenParseError::MissingArgument => write!(f, "Missing argument at the end of expression."),
+            TokenParseError::UnknownError => write!(f, "Unknown pass error."),
         }
     }
 }
@@ -58,8 +61,10 @@ impl std::error::Error for TokenParseError {
     fn description(&self) -> &str {
         match *self {
             TokenParseError::UnexpectedToken(_) => "unexpected token",
+            TokenParseError::UnexpectedStrToken(_) => "Unexpected token",
             TokenParseError::MissingRParen(_) => "missing right parenthesis",
             TokenParseError::MissingArgument => "missing argument",
+            TokenParseError::UnknownError => "unknown error",
         }
     }
 }
@@ -91,7 +96,7 @@ pub enum Token {
     /// Comma: function argument separator
     Comma,
     /// Decimal Point 
-    DecimalPoint,
+    //DecimalPoint,
 
     /// A number.
     Number(f64),
@@ -188,46 +193,18 @@ fn var<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
 /// Parse `func(`, returns `func`.
 fn func<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
   map(
+    //recognize(
         terminated(
             complete(ident),
-            preceded(opt(multispace0), complete(tag("(")))
-        ),
+            preceded(multispace0,
+                     complete(tag("("))
+            )
+        )
+    //)
+        ,
         |s: &str| Token::Func(s.into(), None)
     )(i)
 }
-
-// Done("+(3--2)", Number(2.0))
-// println!("{:?}", number("2 +(3--2) "));
-
-
-// named!(
-//     float<usize>,
-//     chain!(
-//         a: digit_complete ~
-//         b: complete!(chain!(tag!(".") ~ d: digit_complete?,
-//                             ||{1 + d.map(|s| s.len()).unwrap_or(0)}))? ~
-//         e: complete!(exp),
-//         ||{a.len() + b.unwrap_or(0) + e.unwrap_or(0)}
-//     )
-// );
-
-// /// Parser that matches the exponential part of a float. If the `input[0] == 'e' | 'E'` then at
-// /// least one digit must match.
-// fn exp(input: &[u8]) -> IResult<&[u8], Option<usize>> {
-//     use nom::IResult::*;
-//     match alt!(input, tag!("e") | tag!("E")) {
-//         Incomplete(_) | Error(_) => Done(input, None),
-//         Done(i, _) => match chain!(i, s: alt!(tag!("+") | tag!("-"))? ~
-//                    e: digit_complete,
-//                 ||{Some(1 + s.map(|s| s.len()).unwrap_or(0) + e.len())})
-//         {
-//             Incomplete(Needed::Size(i)) => Incomplete(Needed::Size(i + 1)),
-//             o => o,
-//         },
-//     }
-// }
-
-
 
 fn number<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
     preceded(
@@ -316,8 +293,6 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenParseError> {
         match r {
             Ok((rest, t)) => {
 
-                println!("ok rest {:?}   t {:?}", rest, t);
-
                 match t {
                     Token::LParen => {
                         paren_stack.push(ParenState::Subexpr);
@@ -340,7 +315,15 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenParseError> {
                 s = rest;
             }
             Err(e) => {
-                panic!("{:?}", e);
+        
+                match e {
+                    Err::Error((value, _)) => {
+                        return Err(TokenParseError::UnexpectedStrToken(value.to_string()));
+                    },
+                    _ => (),
+                }
+
+                return Err(TokenParseError::UnknownError);
             }
             // Error(Err::Position(_, p)) => {
             //     let (i, _) = slice_to_offsets(input, p);
@@ -353,13 +336,8 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenParseError> {
 
     }
 
-    println!("match state: {:?}", state);
-    println!("res: {:?}", res);
-//Ok([Var("a")])
-
     match state {
         TokenizerState::LExpr => {
-            println!("IN STATE LExpr");
             Err(TokenParseError::MissingArgument)
         },
 
@@ -522,22 +500,6 @@ mod tests {
             number("abc"),
             Err(Err::Error(("abc", nom::error::ErrorKind::Float)))
         );
-        // assert_eq!(
-        //     lexpr("a"),
-        //     Err(Err::Error(("a", nom::error::ErrorKind::)))
-        // );
-
-        // Error(Position(Alt, [50, 32, 43, 40, 51, 45, 45, 50, 41, 32]))  2 +(3--2)
-        //println!("{:?}", after_rexpr_no_paren("2 +(3--2) "));
-        // after_rexpr_no_paren(s),
-        //     (TokenizerState::AfterRExpr, Some(&ParenState::Subexpr)) => after_rexpr(s),
-        //     (TokenizerState::AfterRExpr, Some(&ParenState::Func)) => after_rexpr_comma(s),
-
-
-      
-
-
-
     }
 
     #[test]
@@ -605,19 +567,6 @@ mod tests {
             Ok(("", Token::Number(45.0)))
         );
 
-
-        // println!("1 {:?}", float(b"1.36"));  // Done([], 4)
-        // println!("1 {:?}", float(b"1.3e2"));  // Done([], 5)
-        // println!("1 {:?}", float(b"1.3e-2"));  // Done([], 6)
-        // println!("1 {:?}", float(b"-1.3e2"));  // Error(Position(Digit, [45, 49, 46, 51, 101, 50]))
-        // println!("1 {:?}", float(b"+3E-4"));  // Error(Position(Digit, [43, 51, 69, 45, 52]))
-        // println!("1 {:?}", float(b"+2E04"));  // Error(Position(Digit, [43, 50, 69, 48, 52]))
-        // println!("1 {:?}", float(b"1E"));  // Error(Position(Complete, [69]))
-        // println!("2  {:?}", float(b"1e+"));  // Error(Position(Digit, []))
-        // println!("3  {:?}", float(b"1e+-?%"));  // Error(Position(Digit, [45, 63, 37]))
-        
-
-
         assert_eq!(
             number("+(3--2) "),
             Err(Err::Error(("+(3--2) ", nom::error::ErrorKind::OneOf)))
@@ -637,30 +586,10 @@ mod tests {
             number("(3) "),
             Err(Err::Error(("(3) ", nom::error::ErrorKind::OneOf)))
         );
-
         assert_eq!(
             number("(3) - (2) "),
             Err(Err::Error(("(3) - (2) ", nom::error::ErrorKind::OneOf)))
         );
-
-
-        println!("{:?}", number("1E"));
-        println!("{:?}", number("1e+"));
-
-        // println!("1 {:?}", number(b"1E"));  // Error(Position(Complete, [69]))
-        // println!("2  {:?}", number(b"1e+"));  // Error(Position(Digit, []))
-        // println!("3  {:?}", number(b"1e+-?%"));  // Error(Position(Digit, [45, 63, 37]))
-
-        // let parser = |s: &str| { nom::number::complete::double(s)};
-        // assert_eq!(parser("1.1"), Ok(("", 1.1)));
-
-        //  println!("{:?}", parser("3--2 "));
-
-        // let r : IResult<&str, f64, ParseError<&str>> = double("3--2 ");
-        // println!("{:?}", r);
-        println!("{:?}", number("3--2 "));     // Done([45, 45, 50, 32], Number(3.0))
-        println!("{:?}", number("3-2) "));     // Done([45, 50, 41, 32], Number(3.0))
-
         assert_eq!(
             number("32143"),
             Ok(("", Token::Number(32143f64)))
@@ -742,7 +671,9 @@ mod tests {
         use super::Operation::*;
         use super::Token::*;
 
-        // assert_eq!(tokenize("a"), Ok(vec![Var("a".into())]));
+        println!("{:?}", tokenize("2 + 2/3-56 + sin(3)"));
+
+        assert_eq!(tokenize("a"), Ok(vec![Var("a".into())]));
 
         assert_eq!(
             tokenize("2 +(3--2) "),
@@ -819,15 +750,15 @@ mod tests {
             ])
         );
 
-        assert_eq!(tokenize("!3"), Err(TokenParseError::UnexpectedToken(0)));
+        assert_eq!(tokenize("!3"), Err(TokenParseError::UnexpectedStrToken("!3".to_string())));
 
-        assert_eq!(tokenize("()"), Err(TokenParseError::UnexpectedToken(1)));
+        assert_eq!(tokenize("()"), Err(TokenParseError::UnexpectedStrToken(")".to_string())));
 
         assert_eq!(tokenize(""), Err(TokenParseError::MissingArgument));
-        assert_eq!(tokenize("2)"), Err(TokenParseError::UnexpectedToken(1)));
+        assert_eq!(tokenize("2)"), Err(TokenParseError::UnexpectedStrToken(")".to_string())));
         assert_eq!(tokenize("2^"), Err(TokenParseError::MissingArgument));
         assert_eq!(tokenize("(((2)"), Err(TokenParseError::MissingRParen(2)));
-        assert_eq!(tokenize("f(2,)"), Err(TokenParseError::UnexpectedToken(4)));
-        assert_eq!(tokenize("f(,2)"), Err(TokenParseError::UnexpectedToken(2)));
+        assert_eq!(tokenize("f(2,)"), Err(TokenParseError::UnexpectedStrToken(")".to_string())));
+        assert_eq!(tokenize("f(,2)"), Err(TokenParseError::UnexpectedStrToken(",2)".to_string())));
     }
 }
