@@ -671,6 +671,8 @@ mod tests {
         use super::Operation::*;
         use super::Token::*;
 
+        // Ok([Number(2.0), Binary(Plus), Number(2.0), Binary(Div), Number(3.0), Binary(Minus), Number(56.0), Binary(Plus), Func("sin", None), Number(3.0), RParen])
+        // Ok([Number(2.0), Binary(Plus), Number(2.0), Binary(Div), Number(3.0), Binary(Minus), Number(56.0), Binary(Plus), Func("sin", None), Number(3.0), RParen])
         println!("{:?}", tokenize("2 + 2/3-56 + sin(3)"));
 
         assert_eq!(tokenize("a"), Ok(vec![Var("a".into())]));
