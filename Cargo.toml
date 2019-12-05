@@ -13,7 +13,7 @@ exclude = ["README.tpl", ".travis.yml"]
 
 [dependencies]
 fnv = "1.0.5"
-nom = "1.0.0"
+nom = "5.0.0"
 serde = { version = "1", optional = true }
 
 [dev-dependencies]
