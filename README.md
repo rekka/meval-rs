@@ -170,8 +170,10 @@ fn main() {
 
 This is a toy project of mine for learning Rust, and to be hopefully useful when writing
 command line scripts. There is no plan to make this anything more than _math expression ->
-number_ "converter". For more advanced scripting, see:
+number_ "converter". For more advanced uses, see:
 
+- [evalexpr] -- A more complete expression evaluator that supports value
+  types, boolean operators, strings, assignment operators, ...
 - [dyon] -- A rusty dynamically typed scripting language
 - [gluon] -- A static, type inferred programming language for application embedding
 - [rodolf0/tox](https://github.com/rodolf0/tox) -- another shunting yard expression parser
@@ -180,6 +182,7 @@ number_ "converter". For more advanced scripting, see:
 [std-float]: http://doc.rust-lang.org/stable/std/primitive.f64.html
 
 [serde]: https://crates.io/crates/serde
+[evalexpr]: https://crates.io/crates/evalexpr
 [dyon]: https://crates.io/crates/dyon
 [gluon]: https://crates.io/crates/gluon
 
