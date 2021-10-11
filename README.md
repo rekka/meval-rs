@@ -22,19 +22,11 @@ Simply add the corresponding entry to your `Cargo.toml` dependency list:
 meval = "0.2"
 ```
 
-and add this to your crate root:
-
-```rust
-extern crate meval;
-```
-
 **Requires Rust 1.26.**
 
 ## Simple examples
 
 ```rust
-extern crate meval;
-
 fn main() {
     let r = meval::eval_str("1 + 2").unwrap();
 
@@ -46,8 +38,6 @@ Need to define a Rust function from an expression? No problem, use `Expr`
 for this and more:
 
 ```rust
-extern crate meval;
-
 fn main() {
     let expr: meval::Expr = "sin(pi * x)".parse().unwrap();
     let func = expr.bind("x").unwrap();
