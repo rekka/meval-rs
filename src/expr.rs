@@ -156,7 +156,7 @@ impl Expr {
     where
         C: ContextProvider + 'a,
     {
-        try!(self.check_context(((var, 0.), &ctx)));
+        self.check_context(((var, 0.), &ctx))?;
         let var = var.to_owned();
         Ok(move |x| {
             self.eval_with_context(((&var, x), &ctx))
@@ -194,7 +194,7 @@ impl Expr {
     where
         C: ContextProvider + 'a,
     {
-        try!(self.check_context(([(var1, 0.), (var2, 0.)], &ctx)));
+        self.check_context(([(var1, 0.), (var2, 0.)], &ctx))?;
         let var1 = var1.to_owned();
         let var2 = var2.to_owned();
         Ok(move |x, y| {
@@ -239,7 +239,7 @@ impl Expr {
     where
         C: ContextProvider + 'a,
     {
-        try!(self.check_context(([(var1, 0.), (var2, 0.), (var3, 0.)], &ctx)));
+        self.check_context(([(var1, 0.), (var2, 0.), (var3, 0.)], &ctx))?;
         let var1 = var1.to_owned();
         let var2 = var2.to_owned();
         let var3 = var3.to_owned();
@@ -287,7 +287,7 @@ impl Expr {
     where
         C: ContextProvider + 'a,
     {
-        try!(self.check_context(([(var1, 0.), (var2, 0.), (var3, 0.), (var4, 0.)], &ctx)));
+        self.check_context(([(var1, 0.), (var2, 0.), (var3, 0.), (var4, 0.)], &ctx))?;
         let var1 = var1.to_owned();
         let var2 = var2.to_owned();
         let var3 = var3.to_owned();
@@ -338,10 +338,10 @@ impl Expr {
     where
         C: ContextProvider + 'a,
     {
-        try!(self.check_context((
+        self.check_context((
             [(var1, 0.), (var2, 0.), (var3, 0.), (var4, 0.), (var5, 0.)],
             &ctx
-        )));
+        ))?;
         let var1 = var1.to_owned();
         let var2 = var2.to_owned();
         let var3 = var3.to_owned();
@@ -389,12 +389,12 @@ impl Expr {
         C: ContextProvider + 'a,
     {
         let n = vars.len();
-        try!(self.check_context((
+        self.check_context((
             vars.into_iter()
                 .zip(vec![0.; n].into_iter())
                 .collect::<Vec<_>>(),
             &ctx
-        )));
+        ))?;
         let vars = vars.iter().map(|v| v.to_owned()).collect::<Vec<_>>();
         Ok(move |x: &[f64]| {
             self.eval_with_context((
@@ -447,7 +447,7 @@ impl Expr {
 
 /// Evaluates a string with built-in constants and functions.
 pub fn eval_str<S: AsRef<str>>(expr: S) -> Result<f64, Error> {
-    let expr = try!(Expr::from_str(expr.as_ref()));
+    let expr = Expr::from_str(expr.as_ref())?;
 
     expr.eval_with_context(builtin())
 }
@@ -456,9 +456,9 @@ impl FromStr for Expr {
     type Err = Error;
     /// Constructs an expression by parsing a string.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let tokens = try!(tokenize(s));
+        let tokens = tokenize(s)?;
 
-        let rpn = try!(to_rpn(&tokens));
+        let rpn = to_rpn(&tokens)?;
 
         Ok(Expr { rpn: rpn })
     }
@@ -471,7 +471,7 @@ pub fn eval_str_with_context<S: AsRef<str>, C: ContextProvider>(
     expr: S,
     ctx: C,
 ) -> Result<f64, Error> {
-    let expr = try!(Expr::from_str(expr.as_ref()));
+    let expr = Expr::from_str(expr.as_ref())?;
 
     expr.eval_with_context(ctx)
 }
@@ -856,7 +856,7 @@ impl<'a> Default for Context<'a> {
     }
 }
 
-type GuardedFunc<'a> = Rc<Fn(&[f64]) -> Result<f64, FuncEvalError> + 'a>;
+type GuardedFunc<'a> = Rc<dyn Fn(&[f64]) -> Result<f64, FuncEvalError> + 'a>;
 
 /// Trait for types that can specify the number of required arguments for a function with a
 /// variable number of arguments.
