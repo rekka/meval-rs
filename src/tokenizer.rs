@@ -5,8 +5,7 @@
 //! The parser should tokenize only well-formed expressions.
 //!
 //! [nom]: https://crates.io/crates/nom
-use nom::{multispace, slice_to_offsets, IResult, Needed};
-use std;
+use nom::{Needed, multispace, slice_to_offsets, IResult};
 use std::fmt;
 use std::str::from_utf8;
 
@@ -117,16 +116,16 @@ named!(comma<Token>, chain!(tag!(","), || Token::Comma));
 fn ident(input: &[u8]) -> IResult<&[u8], &[u8]> {
     use nom::Err::*;
     use nom::IResult::*;
-    use nom::{ErrorKind, Needed};
+    use nom::ErrorKind;
 
     // first character must be 'a'...'z' | 'A'...'Z' | '_'
     match input.first().cloned() {
-        Some(b'a'...b'z') | Some(b'A'...b'Z') | Some(b'_') => {
+        Some(b'a'..=b'z') | Some(b'A'..=b'Z') | Some(b'_') => {
             let n = input
                 .iter()
                 .skip(1)
                 .take_while(|&&c| match c {
-                    b'a'...b'z' | b'A'...b'Z' | b'_' | b'0'...b'9' => true,
+                    b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'0'..=b'9' => true,
                     _ => false,
                 })
                 .count();
@@ -145,7 +144,7 @@ named!(
     ))
 );
 
-/// Parse `func(`, returns `func`.
+// Parse `func(`, returns `func`.
 named!(
     func<Token>,
     map!(
