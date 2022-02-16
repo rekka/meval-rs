@@ -9,18 +9,17 @@
 use nom::{
   branch::alt,
   bytes::complete::is_a,
-  bytes::complete::{escaped, take, tag, take_while},
-  character::complete::{anychar, digit1, multispace0, alphanumeric1, alphanumeric0, char, alpha1, one_of},
-  combinator::{complete, peek, all_consuming, recognize, map, opt, cut, not},
-  error::{context, convert_error, ErrorKind, ParseError, VerboseError},
-  multi::separated_list0,
+  bytes::complete::{tag},
+  character::complete::{multispace0, one_of},
+  combinator::{complete, peek, recognize, map, opt},
+  error::{ErrorKind},
   number::complete::double,
-  sequence::{tuple, pair, delimited, preceded, separated_pair, terminated},
-  Err, Needed, IResult
+  sequence::{delimited, preceded, terminated},
+  Err, IResult
 };
 
 use std::fmt;
-use std::str::from_utf8;
+
 use std::f64;
 
 /// An error reported by the parser.
@@ -155,7 +154,7 @@ fn negpos<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
 
     match negpos_s(i)  {
         Ok((remaining_input, operator)) => {
-            match operator.as_ref() {
+            match operator {
                 "+" => Ok((remaining_input, Token::Unary(Operation::Plus))),
                 "-" => Ok((remaining_input, Token::Unary(Operation::Minus))),
                 _ => panic!("Should never occur")
@@ -167,7 +166,7 @@ fn negpos<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
 
 /// factorial parse
 fn fact<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
-    map(tag("!"), |s: &str| Token::Unary(Operation::Fact))(i)
+    map(tag("!"), |_s: &str| Token::Unary(Operation::Fact))(i)
 }
 
 fn ident<'a>(i: &'a str) -> IResult<&'a str, &'a str, (&'a str, ErrorKind)> {
@@ -210,7 +209,7 @@ fn func<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
 fn number<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
     preceded(
         peek(one_of("0123456789")),
-        map(double, |s| Token::Number(s))
+        map(double, Token::Number)
     )(i)
 }
 
@@ -347,7 +346,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenParseError> {
                 return Err(TokenParseError::MissingRParen(paren_stack.len() as i32));
             }
 
-            return Ok(res);
+            Ok(res)
         }
     }
 
@@ -658,7 +657,7 @@ mod tests {
         for &s in ["abc(", "u0(", "_034 (", "A_be45EA  ("].iter() {
             assert_eq!(
                 func(s),
-                Ok(("", Token::Func((&s[0..s.len() - 1]).trim().into(), None)))
+                Ok(("", Token::Func(s[0..s.len() - 1].trim().into(), None)))
             );
         }
 

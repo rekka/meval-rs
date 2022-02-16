@@ -390,7 +390,7 @@ impl Expr {
     {
         let n = vars.len();
         self.check_context((
-            vars.into_iter()
+            vars.iter()
                 .zip(vec![0.; n].into_iter())
                 .collect::<Vec<_>>(),
             &ctx
@@ -399,7 +399,7 @@ impl Expr {
         Ok(move |x: &[f64]| {
             self.eval_with_context((
                 vars.iter()
-                    .zip(x.into_iter())
+                    .zip(x.iter())
                     .map(|(v, x)| (v, *x))
                     .collect::<Vec<_>>(),
                 &ctx,
@@ -460,7 +460,7 @@ impl FromStr for Expr {
 
         let rpn = to_rpn(&tokens)?;
 
-        Ok(Expr { rpn: rpn })
+        Ok(Expr { rpn })
     }
 }
 
@@ -599,21 +599,21 @@ pub fn builtin<'a>() -> Context<'a> {
 
 impl<'a, T: ContextProvider> ContextProvider for &'a T {
     fn get_var(&self, name: &str) -> Option<f64> {
-        (&**self).get_var(name)
+        (**self).get_var(name)
     }
 
     fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
-        (&**self).eval_func(name, args)
+        (**self).eval_func(name, args)
     }
 }
 
 impl<'a, T: ContextProvider> ContextProvider for &'a mut T {
     fn get_var(&self, name: &str) -> Option<f64> {
-        (&**self).get_var(name)
+        (**self).get_var(name)
     }
 
     fn eval_func(&self, name: &str, args: &[f64]) -> Result<f64, FuncEvalError> {
-        (&**self).eval_func(name, args)
+        (**self).eval_func(name, args)
     }
 }
 
@@ -1170,20 +1170,20 @@ mod tests {
         );
 
         let expr = Expr::from_str("x + y^2 + z^3").unwrap();
-        let func = expr.clone().bind3("x", "y", "z").unwrap();
+        let func = expr.bind3("x", "y", "z").unwrap();
         assert_eq!(func(1., 2., 3.), 32.);
 
         let expr = Expr::from_str("sin(x)").unwrap();
-        let func = expr.clone().bind("x").unwrap();
+        let func = expr.bind("x").unwrap();
         assert_eq!(func(1.), (1f64).sin());
 
         let expr = Expr::from_str("sin(x,2)").unwrap();
-        match expr.clone().bind("x") {
+        match expr.bind("x") {
             Err(Error::Function(_, FuncEvalError::NumberArgs(1))) => {}
             _ => panic!("bind did not error"),
         }
         let expr = Expr::from_str("hey(x,2)").unwrap();
-        match expr.clone().bind("x") {
+        match expr.bind("x") {
             Err(Error::Function(_, FuncEvalError::UnknownFunction)) => {}
             _ => panic!("bind did not error"),
         }
