@@ -340,7 +340,7 @@ impl Expr {
     {
         self.check_context((
             [(var1, 0.), (var2, 0.), (var3, 0.), (var4, 0.), (var5, 0.)],
-            &ctx
+            &ctx,
         ))?;
         let var1 = var1.to_owned();
         let var2 = var2.to_owned();
@@ -390,10 +390,8 @@ impl Expr {
     {
         let n = vars.len();
         self.check_context((
-            vars.iter()
-                .zip(vec![0.; n].into_iter())
-                .collect::<Vec<_>>(),
-            &ctx
+            vars.iter().zip(vec![0.; n].into_iter()).collect::<Vec<_>>(),
+            &ctx,
         ))?;
         let vars = vars.iter().map(|v| v.to_owned()).collect::<Vec<_>>();
         Ok(move |x: &[f64]| {
