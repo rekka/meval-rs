@@ -168,8 +168,8 @@ fn fact<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
 }
 
 fn ident<'a>(i: &'a str) -> IResult<&'a str, &'a str, (&'a str, ErrorKind)> {
-    let REMAINING_CHARS: &str = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let FIRST_CHARS: &str = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let remaining_chars: &str = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let first_chars: &str = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
     // Returns whole strings matched by the given parser.
     recognize(
@@ -177,9 +177,9 @@ fn ident<'a>(i: &'a str) -> IResult<&'a str, &'a str, (&'a str, ErrorKind)> {
         // Note that returned ok value of `preceded()` is ignored by `recognize()`.
         preceded(
             // Parses a single character contained in the given string.
-            one_of(FIRST_CHARS),
+            one_of(first_chars),
             // Parses the longest slice consisting of the given characters
-            opt(is_a(REMAINING_CHARS)),
+            opt(is_a(remaining_chars)),
         ),
     )(i)
 }
