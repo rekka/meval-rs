@@ -2,19 +2,19 @@
 // This is to take advantage of the fact that std::f64::MAX >>> std::u64::MAX
 fn factorial_unsafe(num: f64) -> f64 {
     if num == 0. || num == 1. {
-        return 1.;
+        1.
     } else {
-        return num * factorial_unsafe(num - 1.);
+        num * factorial_unsafe(num - 1.)
     }
 }
 
 pub fn factorial(num: f64) -> Result<f64, &'static str> {
     if num.fract() != 0. || num < 0. {
-        return Err("Number must be non-negative with no fractional component!");
+        Err("Number must be non-negative with no fractional component!")
     } else if num > 170. {
-        return Ok(std::f64::INFINITY);
+        Ok(std::f64::INFINITY)
     } else {
-        return Ok(factorial_unsafe(num));
+        Ok(factorial_unsafe(num))
     }
 }
 

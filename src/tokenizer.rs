@@ -5,45 +5,67 @@
 //! The parser should tokenize only well-formed expressions.
 //!
 //! [nom]: https://crates.io/crates/nom
-use nom::{multispace, slice_to_offsets, IResult, Needed};
-use std;
+
+use nom::{
+    branch::alt,
+    bytes::complete::is_a,
+    bytes::complete::tag,
+    character::complete::{multispace0, one_of},
+    combinator::{complete, map, opt, peek, recognize},
+    error::ErrorKind,
+    number::complete::double,
+    sequence::{delimited, preceded, terminated},
+    Err, IResult,
+};
+
 use std::fmt;
-use std::str::from_utf8;
+
+use std::f64;
 
 /// An error reported by the parser.
 #[derive(Debug, Clone, PartialEq)]
-pub enum ParseError {
+pub enum TokenParseError {
     /// A token that is not allowed at the given location (contains the location of the offending
     /// character in the source string).
     UnexpectedToken(usize),
+
+    UnexpectedStrToken(String),
     /// Missing right parentheses at the end of the source string (contains the number of missing
     /// parens).
     MissingRParen(i32),
     /// Missing operator or function argument at the end of the expression.
     MissingArgument,
+
+    UnknownError,
 }
 
-impl fmt::Display for ParseError {
+impl fmt::Display for TokenParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            ParseError::UnexpectedToken(i) => write!(f, "Unexpected token at byte {}.", i),
-            ParseError::MissingRParen(i) => write!(
+        match &*self {
+            TokenParseError::UnexpectedToken(i) => write!(f, "Unexpected token at byte {}.", i),
+            TokenParseError::UnexpectedStrToken(s) => write!(f, "Unexpected token {}.", s),
+            TokenParseError::MissingRParen(i) => write!(
                 f,
                 "Missing {} right parenthes{}.",
                 i,
-                if i == 1 { "is" } else { "es" }
+                if *i == 1 { "is" } else { "es" }
             ),
-            ParseError::MissingArgument => write!(f, "Missing argument at the end of expression."),
+            TokenParseError::MissingArgument => {
+                write!(f, "Missing argument at the end of expression.")
+            }
+            TokenParseError::UnknownError => write!(f, "Unknown pass error."),
         }
     }
 }
 
-impl std::error::Error for ParseError {
+impl std::error::Error for TokenParseError {
     fn description(&self) -> &str {
         match *self {
-            ParseError::UnexpectedToken(_) => "unexpected token",
-            ParseError::MissingRParen(_) => "missing right parenthesis",
-            ParseError::MissingArgument => "missing argument",
+            TokenParseError::UnexpectedToken(_) => "unexpected token",
+            TokenParseError::UnexpectedStrToken(_) => "Unexpected token",
+            TokenParseError::MissingRParen(_) => "missing right parenthesis",
+            TokenParseError::MissingArgument => "missing argument",
+            TokenParseError::UnknownError => "unknown error",
         }
     }
 }
@@ -74,6 +96,8 @@ pub enum Token {
     RParen,
     /// Comma: function argument separator
     Comma,
+    /// Decimal Point
+    //DecimalPoint,
 
     /// A number.
     Number(f64),
@@ -83,179 +107,119 @@ pub enum Token {
     Func(String, Option<usize>),
 }
 
-named!(
-    binop<Token>,
-    alt!(
-        chain!(tag!("+"), || Token::Binary(Operation::Plus))
-            | chain!(tag!("-"), || Token::Binary(Operation::Minus))
-            | chain!(tag!("*"), || Token::Binary(Operation::Times))
-            | chain!(tag!("/"), || Token::Binary(Operation::Div))
-            | chain!(tag!("%"), || Token::Binary(Operation::Rem))
-            | chain!(tag!("^"), || Token::Binary(Operation::Pow))
-    )
-);
+/// Continuing the trend of starting from the simplest piece and building up,
+/// we start by creating a parser for the built-in operator functions.
+fn binop<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
+    // one_of matches one of the characters we give it
+    let (i, t) = one_of("+-*/%^!")(i)?;
 
-named!(
-    negpos<Token>,
-    alt!(
-        chain!(tag!("+"), || Token::Unary(Operation::Plus))
-            | chain!(tag!("-"), || Token::Unary(Operation::Minus))
-    )
-);
+    // because we are matching single character tokens, we can do the matching logic
+    // on the returned value
+    Ok((
+        i,
+        match t {
+            '+' => Token::Binary(Operation::Plus),
+            '-' => Token::Binary(Operation::Minus),
+            '*' => Token::Binary(Operation::Times),
+            '/' => Token::Binary(Operation::Div),
+            '%' => Token::Binary(Operation::Rem),
+            '^' => Token::Binary(Operation::Pow),
+            '!' => Token::Binary(Operation::Fact),
+            _ => unreachable!(),
+        },
+    ))
+}
 
-named!(
-    fact<Token>,
-    chain!(tag!("!"), || Token::Unary(Operation::Fact))
-);
-named!(lparen<Token>, chain!(tag!("("), || Token::LParen));
-named!(rparen<Token>, chain!(tag!(")"), || Token::RParen));
-named!(comma<Token>, chain!(tag!(","), || Token::Comma));
+fn lparen<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
+    map(tag("("), |_: &str| Token::LParen)(i)
+}
 
-/// Parse an identifier:
-///
-/// Must start with a letter or an underscore, can be followed by letters, digits or underscores.
-fn ident(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    use nom::Err::*;
-    use nom::IResult::*;
-    use nom::{ErrorKind, Needed};
+fn rparen<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
+    map(tag(")"), |_: &str| Token::RParen)(i)
+}
 
-    // first character must be 'a'...'z' | 'A'...'Z' | '_'
-    match input.first().cloned() {
-        Some(b'a'...b'z') | Some(b'A'...b'Z') | Some(b'_') => {
-            let n = input
-                .iter()
-                .skip(1)
-                .take_while(|&&c| match c {
-                    b'a'...b'z' | b'A'...b'Z' | b'_' | b'0'...b'9' => true,
-                    _ => false,
-                })
-                .count();
-            let (parsed, rest) = input.split_at(n + 1);
-            Done(rest, parsed)
-        }
-        None => Incomplete(Needed::Size(1)),
-        _ => Error(Position(ErrorKind::Custom(0), input)),
+fn comma<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
+    map(tag(","), |_: &str| Token::Comma)(i)
+}
+
+/// negpos parse. detects either - or +
+fn negpos_s<'a>(i: &'a str) -> IResult<&'a str, &'a str, (&'a str, ErrorKind)> {
+    match alt((tag("+"), tag("-")))(i) {
+        Ok((remaining_input, operator)) => Ok((remaining_input, operator)),
+        Err(e) => Err(e),
     }
 }
 
-named!(
-    var<Token>,
-    map!(map_res!(complete!(ident), from_utf8), |s: &str| Token::Var(
-        s.into()
-    ))
-);
+/// negpos parse. detects either - or +
+fn negpos<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
+    match negpos_s(i) {
+        Ok((remaining_input, operator)) => match operator {
+            "+" => Ok((remaining_input, Token::Unary(Operation::Plus))),
+            "-" => Ok((remaining_input, Token::Unary(Operation::Minus))),
+            _ => panic!("Should never occur"),
+        },
+        Err(e) => Err(e),
+    }
+}
+
+/// factorial parse
+fn fact<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
+    map(tag("!"), |_s: &str| Token::Unary(Operation::Fact))(i)
+}
+
+fn ident<'a>(i: &'a str) -> IResult<&'a str, &'a str, (&'a str, ErrorKind)> {
+    let remaining_chars: &str = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let first_chars: &str = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    // Returns whole strings matched by the given parser.
+    recognize(
+        // Runs the first parser, if succeeded then runs second, and returns the second result.
+        // Note that returned ok value of `preceded()` is ignored by `recognize()`.
+        preceded(
+            // Parses a single character contained in the given string.
+            one_of(first_chars),
+            // Parses the longest slice consisting of the given characters
+            opt(is_a(remaining_chars)),
+        ),
+    )(i)
+}
+
+fn var<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
+    map(complete(ident), |s: &str| Token::Var(s.into()))(i)
+}
 
 /// Parse `func(`, returns `func`.
-named!(
-    func<Token>,
-    map!(
-        map_res!(
-            terminated!(
-                complete!(ident),
-                preceded!(opt!(multispace), complete!(tag!("(")))
-            ),
-            from_utf8
-        ),
-        |s: &str| Token::Func(s.into(), None)
-    )
-);
-
-/// Matches one or more digit characters `0`...`9`.
-///
-/// Never returns `nom::IResult::Incomplete`.
-///
-/// Fix of IMHO broken `nom::digit`, which parses an empty string successfully.
-fn digit_complete(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    use nom::Err::*;
-    use nom::IResult::*;
-    use nom::{is_digit, ErrorKind};
-
-    let n = input.iter().take_while(|&&c| is_digit(c)).count();
-    if n > 0 {
-        let (parsed, rest) = input.split_at(n);
-        Done(rest, parsed)
-    } else {
-        Error(Position(ErrorKind::Digit, input))
-    }
+fn func<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
+    map(
+        //recognize(
+        terminated(complete(ident), preceded(multispace0, complete(tag("(")))), //)
+        |s: &str| Token::Func(s.into(), None),
+    )(i)
 }
 
-named!(
-    float<usize>,
-    chain!(
-        a: digit_complete ~
-        b: complete!(chain!(tag!(".") ~ d: digit_complete?,
-                            ||{1 + d.map(|s| s.len()).unwrap_or(0)}))? ~
-        e: complete!(exp),
-        ||{a.len() + b.unwrap_or(0) + e.unwrap_or(0)}
-    )
-);
-
-/// Parser that matches the exponential part of a float. If the `input[0] == 'e' | 'E'` then at
-/// least one digit must match.
-fn exp(input: &[u8]) -> IResult<&[u8], Option<usize>> {
-    use nom::IResult::*;
-    match alt!(input, tag!("e") | tag!("E")) {
-        Incomplete(_) | Error(_) => Done(input, None),
-        Done(i, _) => match chain!(i, s: alt!(tag!("+") | tag!("-"))? ~
-                   e: digit_complete,
-                ||{Some(1 + s.map(|s| s.len()).unwrap_or(0) + e.len())})
-        {
-            Incomplete(Needed::Size(i)) => Incomplete(Needed::Size(i + 1)),
-            o => o,
-        },
-    }
+fn number<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
+    preceded(peek(one_of("0123456789")), map(double, Token::Number))(i)
 }
 
-fn number(input: &[u8]) -> IResult<&[u8], Token> {
-    use nom::Err;
-    use nom::ErrorKind;
-    use nom::IResult::*;
-    use std::str::FromStr;
-
-    match float(input) {
-        Done(rest, l) => {
-            // it should be safe to call unwrap here instead of the error checking, since
-            // `float` should match only well-formed numbers
-            from_utf8(&input[..l])
-                .ok()
-                .and_then(|s| f64::from_str(s).ok())
-                .map_or(Error(Err::Position(ErrorKind::Custom(0), input)), |f| {
-                    Done(rest, Token::Number(f))
-                })
-        }
-        Error(e) => Error(e),
-        Incomplete(n) => Incomplete(n),
-    }
+fn lexpr<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
+    delimited(
+        multispace0,
+        alt((number, func, var, negpos, lparen)),
+        multispace0,
+    )(i)
 }
 
-named!(
-    lexpr<Token>,
-    delimited!(
-        opt!(multispace),
-        alt!(number | func | var | negpos | lparen),
-        opt!(multispace)
-    )
-);
-named!(
-    after_rexpr<Token>,
-    delimited!(
-        opt!(multispace),
-        alt!(fact | binop | rparen),
-        opt!(multispace)
-    )
-);
-named!(
-    after_rexpr_no_paren<Token>,
-    delimited!(opt!(multispace), alt!(fact | binop), opt!(multispace))
-);
-named!(
-    after_rexpr_comma<Token>,
-    delimited!(
-        opt!(multispace),
-        alt!(fact | binop | rparen | comma),
-        opt!(multispace)
-    )
-);
+fn after_rexpr<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
+    delimited(multispace0, alt((fact, binop, rparen)), multispace0)(i)
+}
+
+fn after_rexpr_no_paren<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
+    delimited(multispace0, alt((fact, binop)), multispace0)(i)
+}
+
+fn after_rexpr_comma<'a>(i: &'a str) -> IResult<&'a str, Token, (&'a str, ErrorKind)> {
+    delimited(multispace0, alt((fact, binop, rparen, comma)), multispace0)(i)
+}
 
 #[derive(Debug, Clone, Copy)]
 enum TokenizerState {
@@ -278,29 +242,25 @@ enum ParenState {
 /// # Failure
 ///
 /// Returns `Err` if the expression is not well-formed.
-pub fn tokenize<S: AsRef<str>>(input: S) -> Result<Vec<Token>, ParseError> {
-    use self::TokenizerState::*;
-    use nom::Err;
-    use nom::IResult::*;
-    let mut state = LExpr;
+pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenParseError> {
+    let mut state: TokenizerState = TokenizerState::LExpr;
     // number of function arguments left
     let mut paren_stack = vec![];
 
     let mut res = vec![];
 
-    let input = input.as_ref().as_bytes();
     let mut s = input;
 
     while !s.is_empty() {
         let r = match (state, paren_stack.last()) {
-            (LExpr, _) => lexpr(s),
-            (AfterRExpr, None) => after_rexpr_no_paren(s),
-            (AfterRExpr, Some(&ParenState::Subexpr)) => after_rexpr(s),
-            (AfterRExpr, Some(&ParenState::Func)) => after_rexpr_comma(s),
+            (TokenizerState::LExpr, _) => lexpr(s),
+            (TokenizerState::AfterRExpr, None) => after_rexpr_no_paren(s),
+            (TokenizerState::AfterRExpr, Some(&ParenState::Subexpr)) => after_rexpr(s),
+            (TokenizerState::AfterRExpr, Some(&ParenState::Func)) => after_rexpr_comma(s),
         };
 
         match r {
-            Done(rest, t) => {
+            Ok((rest, t)) => {
                 match t {
                     Token::LParen => {
                         paren_stack.push(ParenState::Subexpr);
@@ -312,139 +272,244 @@ pub fn tokenize<S: AsRef<str>>(input: S) -> Result<Vec<Token>, ParseError> {
                         paren_stack.pop().expect("The paren_stack is empty!");
                     }
                     Token::Var(_) | Token::Number(_) => {
-                        state = AfterRExpr;
+                        state = TokenizerState::AfterRExpr;
                     }
                     Token::Binary(_) | Token::Comma => {
-                        state = LExpr;
+                        state = TokenizerState::LExpr;
                     }
                     _ => {}
                 }
                 res.push(t);
                 s = rest;
             }
-            Error(Err::Position(_, p)) => {
-                let (i, _) = slice_to_offsets(input, p);
-                return Err(ParseError::UnexpectedToken(i));
+            Err(e) => {
+                match e {
+                    Err::Error((value, _)) => {
+                        return Err(TokenParseError::UnexpectedStrToken(value.to_string()));
+                    }
+                    _ => (),
+                }
+
+                return Err(TokenParseError::UnknownError);
             }
+            // Error(Err::Position(_, p)) => {
+            //     let (i, _) = slice_to_offsets(input, p);
+            //     return Err(TokenParseError::UnexpectedToken(i));
+            // }
             _ => {
                 panic!(
                     "Unexpected parse result when parsing `{}` at `{}`: {:?}",
-                    String::from_utf8_lossy(input),
-                    String::from_utf8_lossy(s),
-                    r
+                    input, s, r
                 );
             }
         }
     }
 
     match state {
-        LExpr => Err(ParseError::MissingArgument),
-        _ if !paren_stack.is_empty() => Err(ParseError::MissingRParen(paren_stack.len() as i32)),
-        _ => Ok(res),
+        TokenizerState::LExpr => Err(TokenParseError::MissingArgument),
+
+        _ => {
+            if !paren_stack.is_empty() {
+                return Err(TokenParseError::MissingRParen(paren_stack.len() as i32));
+            }
+
+            Ok(res)
+        }
     }
 }
+
+// ok rest ["+(3--2) "]   t Number(2.0)
+// ok rest ["(3--2) "]   t Binary(Plus)
+// ok rest [51, 45, 45, 50, 41, 32]   t LParen
+// ok rest [45, 45, 50, 41, 32]   t Number(3.0)
+// ok rest [45, 50, 41, 32]   t Binary(Minus)
+// ok rest [50, 41, 32]   t Unary(Minus)
+// ok rest [") "]   t Number(2.0)
+// ok rest []   t RParen
+// state: AfterRExpr
+// paren_stack: []
+// Ok([Number(2.0), Binary(Plus), LParen, Number(3.0), Binary(Minus), Unary(Minus), Number(2.0), RParen])
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::{binop, func, number, var};
-    use nom::Err::*;
-    use nom::ErrorKind::*;
-    use nom::IResult;
 
     #[test]
     fn it_works() {
+        assert_eq!(binop("+"), Ok(("", Token::Binary(Operation::Plus))));
+        assert_eq!(ident("abc32"), Ok(("", "abc32")));
+        assert_eq!(func("abc("), Ok(("", Token::Func("abc".into(), None))));
+        assert_eq!(func("abc ("), Ok(("", Token::Func("abc".into(), None))));
+        assert_eq!(var("abc"), Ok(("", Token::Var("abc".into()))));
+        assert_eq!(fact("!"), Ok(("", Token::Unary(Operation::Fact))));
+        assert_eq!(negpos_s("+"), Ok(("", "+")));
+        assert_eq!(negpos_s("-"), Ok(("", "-")));
+        assert_eq!(negpos_s("+362"), Ok(("362", "+")));
+        assert_eq!(negpos_s("-5734"), Ok(("5734", "-")));
+        assert_eq!(negpos("+"), Ok(("", Token::Unary(Operation::Plus))));
+        assert_eq!(negpos("-"), Ok(("", Token::Unary(Operation::Minus))));
+        assert_eq!(negpos("+642"), Ok(("642", Token::Unary(Operation::Plus))));
+        assert_eq!(negpos("-563"), Ok(("563", Token::Unary(Operation::Minus))));
+        assert_eq!(lparen("("), Ok(("", Token::LParen)));
+        assert_eq!(rparen(")"), Ok(("", Token::RParen)));
+        assert_eq!(comma(","), Ok(("", Token::Comma)));
+        assert_eq!(comma(","), Ok(("", Token::Comma)));
+        assert_eq!(number("+1.34e2"), Ok(("", Token::Number(134.0))));
+        assert_eq!(number("+1.34e+2"), Ok(("", Token::Number(134.0))));
+        assert_eq!(number("3E+2"), Ok(("", Token::Number(300.0))));
+        assert_eq!(number("+4E+2"), Ok(("", Token::Number(400.0))));
+        assert_eq!(number("-4.76E+2"), Ok(("", Token::Number(-476.0))));
+        assert_eq!(number("-4.76"), Ok(("", Token::Number(-4.76))));
+        assert_eq!(number("+4.76"), Ok(("", Token::Number(4.76))));
+        assert_eq!(number("1.1"), Ok(("", Token::Number(1.1))));
+        assert_eq!(number("-1.1"), Ok(("", Token::Number(-1.1))));
+        assert_eq!(number("123E-02"), Ok(("", Token::Number(1.23))));
+        assert_eq!(number("+123E-02"), Ok(("", Token::Number(1.23))));
+        assert_eq!(number("-123E-02"), Ok(("", Token::Number(-1.23))));
         assert_eq!(
-            binop(b"+"),
-            IResult::Done(&b""[..], Token::Binary(Operation::Plus))
+            number("abc"),
+            Err(Err::Error(("abc", nom::error::ErrorKind::Float)))
         );
+    }
+
+    #[test]
+    fn test_lexpr() {
+        // number, func, var, negpos, lparen
         assert_eq!(
-            number(b"32143"),
-            IResult::Done(&b""[..], Token::Number(32143f64))
+            number("a"),
+            Err(Err::Error(("a", nom::error::ErrorKind::Float)))
         );
+
+        assert_eq!(func("a"), Err(Err::Error(("", nom::error::ErrorKind::Tag))));
+
+        assert_eq!(var("a"), Ok(("", Token::Var("a".into()))));
+
+        assert_eq!(lexpr("a"), Ok(("", Token::Var("a".into()))));
+
+        assert_eq!(lexpr("2+"), Ok(("+", Token::Number(2.0))));
+
+        assert_eq!(lexpr("2 +(3--2) "), Ok(("+(3--2) ", Token::Number(2.0))));
+
+        println!("{:?}", number("+(3--2) "));
+
         assert_eq!(
-            var(b"abc"),
-            IResult::Done(&b""[..], Token::Var("abc".into()))
-        );
-        assert_eq!(
-            func(b"abc("),
-            IResult::Done(&b""[..], Token::Func("abc".into(), None))
-        );
-        assert_eq!(
-            func(b"abc ("),
-            IResult::Done(&b""[..], Token::Func("abc".into(), None))
+            lexpr("+(3--2) "),
+            Ok(("+(3--2) ", Token::Binary(Operation::Plus)))
         );
     }
 
     #[test]
     fn test_var() {
         for &s in ["abc", "U0", "_034", "a_be45EA", "aAzZ_"].iter() {
-            assert_eq!(
-                var(s.as_bytes()),
-                IResult::Done(&b""[..], Token::Var(s.into()))
-            );
+            assert_eq!(var(s), Ok(("", Token::Var(s.into()))));
         }
 
-        assert_eq!(var(b""), IResult::Error(Position(Complete, &b""[..])));
-        assert_eq!(var(b"0"), IResult::Error(Position(Custom(0), &b"0"[..])));
+        assert_eq!(var(""), Err(Err::Error(("", nom::error::ErrorKind::OneOf))));
+        assert_eq!(
+            var("0"),
+            Err(Err::Error(("0", nom::error::ErrorKind::OneOf)))
+        );
+    }
+
+    #[test]
+    fn test_number() {
+        assert_eq!(number("45"), Ok(("", Token::Number(45.0))));
+
+        assert_eq!(
+            number("+(3--2) "),
+            Err(Err::Error(("+(3--2) ", nom::error::ErrorKind::OneOf)))
+        );
+
+        assert_eq!(
+            number("+3 "),
+            Err(Err::Error(("+3 ", nom::error::ErrorKind::OneOf)))
+        );
+
+        assert_eq!(
+            number("(3--2) "),
+            Err(Err::Error(("(3--2) ", nom::error::ErrorKind::OneOf)))
+        );
+
+        assert_eq!(
+            number("(3) "),
+            Err(Err::Error(("(3) ", nom::error::ErrorKind::OneOf)))
+        );
+        assert_eq!(
+            number("(3) - (2) "),
+            Err(Err::Error(("(3) - (2) ", nom::error::ErrorKind::OneOf)))
+        );
+        assert_eq!(number("32143"), Ok(("", Token::Number(32143f64))));
+        assert_eq!(number("2."), Ok(("", Token::Number(2.0f64))));
+        assert_eq!(number("32143.25"), Ok(("", Token::Number(32143.25f64))));
+        assert_eq!(number("0.125e9"), Ok(("", Token::Number(0.125e9f64))));
+        assert_eq!(number("20.5E-3"), Ok(("", Token::Number(20.5E-3f64))));
+        assert_eq!(number("123423e+50"), Ok(("", Token::Number(123423e+50f64))));
+        assert_eq!(number("0.2"), Ok(("", Token::Number(0.2))));
+        assert_eq!(
+            number(""),
+            Err(Err::Error(("", nom::error::ErrorKind::OneOf)))
+        );
+        assert_eq!(
+            number("+"),
+            Err(Err::Error(("+", nom::error::ErrorKind::OneOf)))
+        );
+        assert_eq!(
+            number("e"),
+            Err(Err::Error(("e", nom::error::ErrorKind::OneOf)))
+        );
+        assert_eq!(
+            number("1E"),
+            Err(Err::Error(("E", nom::error::ErrorKind::Eof)))
+        );
+        assert_eq!(
+            number("1e"),
+            Err(Err::Error(("e", nom::error::ErrorKind::Eof)))
+        );
+        assert_eq!(
+            number("1e+"),
+            Err(Err::Error(("+", nom::error::ErrorKind::Eof)))
+        );
+        assert_eq!(
+            number("1e+-?%"),
+            Err(Err::Error(("-?%", nom::error::ErrorKind::Eof)))
+        );
+        assert_eq!(
+            number("2+"),
+            Err(Err::Error(("+", nom::error::ErrorKind::Eof)))
+        );
     }
 
     #[test]
     fn test_func() {
         for &s in ["abc(", "u0(", "_034 (", "A_be45EA  ("].iter() {
             assert_eq!(
-                func(s.as_bytes()),
-                IResult::Done(
-                    &b""[..],
-                    Token::Func((&s[0..s.len() - 1]).trim().into(), None)
-                )
+                func(s),
+                Ok(("", Token::Func(s[0..s.len() - 1].trim().into(), None)))
             );
         }
 
-        assert_eq!(func(b""), IResult::Error(Position(Complete, &b""[..])));
-        assert_eq!(func(b"("), IResult::Error(Position(Custom(0), &b"("[..])));
-        assert_eq!(func(b"0("), IResult::Error(Position(Custom(0), &b"0("[..])));
-    }
-
-    #[test]
-    fn test_number() {
         assert_eq!(
-            number(b"32143"),
-            IResult::Done(&b""[..], Token::Number(32143f64))
+            func(""),
+            Err(Err::Error(("", nom::error::ErrorKind::OneOf)))
         );
         assert_eq!(
-            number(b"2."),
-            IResult::Done(&b""[..], Token::Number(2.0f64))
+            func("("),
+            Err(Err::Error(("(", nom::error::ErrorKind::OneOf)))
         );
         assert_eq!(
-            number(b"32143.25"),
-            IResult::Done(&b""[..], Token::Number(32143.25f64))
+            func("0("),
+            Err(Err::Error(("0(", nom::error::ErrorKind::OneOf)))
         );
-        assert_eq!(
-            number(b"0.125e9"),
-            IResult::Done(&b""[..], Token::Number(0.125e9f64))
-        );
-        assert_eq!(
-            number(b"20.5E-3"),
-            IResult::Done(&b""[..], Token::Number(20.5E-3f64))
-        );
-        assert_eq!(
-            number(b"123423e+50"),
-            IResult::Done(&b""[..], Token::Number(123423e+50f64))
-        );
-
-        assert_eq!(number(b""), IResult::Error(Position(Digit, &b""[..])));
-        assert_eq!(number(b".2"), IResult::Error(Position(Digit, &b".2"[..])));
-        assert_eq!(number(b"+"), IResult::Error(Position(Digit, &b"+"[..])));
-        assert_eq!(number(b"e"), IResult::Error(Position(Digit, &b"e"[..])));
-        assert_eq!(number(b"1E"), IResult::Error(Position(Complete, &b"E"[..])));
-        assert_eq!(number(b"1e+"), IResult::Error(Position(Digit, &b""[..])));
     }
 
     #[test]
     fn test_tokenize() {
         use super::Operation::*;
         use super::Token::*;
+
+        // Ok([Number(2.0), Binary(Plus), Number(2.0), Binary(Div), Number(3.0), Binary(Minus), Number(56.0), Binary(Plus), Func("sin", None), Number(3.0), RParen])
+        // Ok([Number(2.0), Binary(Plus), Number(2.0), Binary(Div), Number(3.0), Binary(Minus), Number(56.0), Binary(Plus), Func("sin", None), Number(3.0), RParen])
+        println!("{:?}", tokenize("2 + 2/3-56 + sin(3)"));
 
         assert_eq!(tokenize("a"), Ok(vec![Var("a".into())]));
 
@@ -523,15 +588,30 @@ mod tests {
             ])
         );
 
-        assert_eq!(tokenize("!3"), Err(ParseError::UnexpectedToken(0)));
+        assert_eq!(
+            tokenize("!3"),
+            Err(TokenParseError::UnexpectedStrToken("!3".to_string()))
+        );
 
-        assert_eq!(tokenize("()"), Err(ParseError::UnexpectedToken(1)));
+        assert_eq!(
+            tokenize("()"),
+            Err(TokenParseError::UnexpectedStrToken(")".to_string()))
+        );
 
-        assert_eq!(tokenize(""), Err(ParseError::MissingArgument));
-        assert_eq!(tokenize("2)"), Err(ParseError::UnexpectedToken(1)));
-        assert_eq!(tokenize("2^"), Err(ParseError::MissingArgument));
-        assert_eq!(tokenize("(((2)"), Err(ParseError::MissingRParen(2)));
-        assert_eq!(tokenize("f(2,)"), Err(ParseError::UnexpectedToken(4)));
-        assert_eq!(tokenize("f(,2)"), Err(ParseError::UnexpectedToken(2)));
+        assert_eq!(tokenize(""), Err(TokenParseError::MissingArgument));
+        assert_eq!(
+            tokenize("2)"),
+            Err(TokenParseError::UnexpectedStrToken(")".to_string()))
+        );
+        assert_eq!(tokenize("2^"), Err(TokenParseError::MissingArgument));
+        assert_eq!(tokenize("(((2)"), Err(TokenParseError::MissingRParen(2)));
+        assert_eq!(
+            tokenize("f(2,)"),
+            Err(TokenParseError::UnexpectedStrToken(")".to_string()))
+        );
+        assert_eq!(
+            tokenize("f(,2)"),
+            Err(TokenParseError::UnexpectedStrToken(",2)".to_string()))
+        );
     }
 }

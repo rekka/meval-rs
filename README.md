@@ -104,7 +104,7 @@ supported:
 - functions implemented using functions of the same name in [Rust std library][std-float]:
 
     - `sqrt`, `abs`
-    - `exp`, `ln`, `log10`
+    - `exp`, `ln`, `log10` (`log10` can also be called as `log`)
     - `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`
     - `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh`
     - `floor`, `ceil`, `round`
