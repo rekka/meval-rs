@@ -1,5 +1,5 @@
 [package]
-authors = ["Norbert Pozar <bertapozar@gmail.com>"]
+authors = ["Norbert Pozar <bertapozar@gmail.com>", "Andrei Velikoredchanin <andy@andyhost.world>"]
 description = "A simple math expression parser and evaluator."
 documentation = "https://docs.rs/meval"
 homepage = "https://github.com/rekka/meval-rs"
@@ -8,20 +8,21 @@ license = "Unlicense/MIT"
 name = "meval"
 readme = "README.md"
 repository = "https://github.com/rekka/meval-rs"
-version = "0.2.0"
+version = "0.3.0"
 exclude = ["README.tpl", ".travis.yml"]
+edition = "2021"
 
 [dependencies]
 fnv = "1.0.5"
-nom = "1.0.0"
+nom = "8.0.0"
 serde = { version = "1", optional = true }
 
 [dev-dependencies]
-gnuplot = "0.0.23"
+gnuplot = "0.0.46"
 serde_test = "1"
 serde_derive = "1"
 serde_json = "1"
-toml = "0.4.5"
+toml = "1.1"
 
 [features]
 default = []
