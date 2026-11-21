@@ -183,7 +183,6 @@
 //! [dyon]: https://crates.io/crates/dyon
 //! [gluon]: https://crates.io/crates/gluon
 
-#[macro_use]
 extern crate nom;
 extern crate fnv;
 #[cfg(feature = "serde")]
